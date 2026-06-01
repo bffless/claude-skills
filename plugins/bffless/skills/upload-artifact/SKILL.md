@@ -105,8 +105,10 @@ You can upload multiple artifacts in the same workflow:
 | `base-path` | no | `/<path>` | URL prefix the alias serves under. See [Base path and URL shape](#base-path-and-url-shape). |
 | `committed-at` | no | auto | ISO 8601 commit timestamp |
 | `description` | no | -- | Human-readable description |
-| `proxy-rule-set-name` | no | -- | Proxy rule set name |
-| `proxy-rule-set-id` | no | -- | Proxy rule set ID |
+| `proxy-rule-set-name` | no | -- | Single proxy rule set name (legacy — prefer `proxy-rule-set-names`) |
+| `proxy-rule-set-id` | no | -- | Single proxy rule set ID (legacy — prefer `proxy-rule-set-ids`) |
+| `proxy-rule-set-names` | no | -- | Comma-separated proxy rule set names. Appended idempotently — re-deploying with the same names is a no-op. See [Attaching multiple proxy rule sets](#attaching-multiple-proxy-rule-sets). |
+| `proxy-rule-set-ids` | no | -- | Comma-separated proxy rule set IDs. Same append-and-dedupe semantics as `proxy-rule-set-names`. |
 | `tags` | no | -- | Comma-separated tags |
 | `summary` | no | `'true'` | Write GitHub Step Summary |
 | `summary-title` | no | `'Deployment Summary'` | Summary heading |
@@ -179,6 +181,28 @@ Rule of thumb:
 
 - **Do not use `base-path: ./`** — the backend normalization only strips leading/trailing slashes, so `./` becomes the literal segment `.` and gets prepended to every lookup, breaking all requests. Use `/` instead.
 - Empty / whitespace values are also unsafe; pass exactly `/` to mean "no prefix."
+
+## Attaching multiple proxy rule sets
+
+Use `proxy-rule-set-names` (or `proxy-rule-set-ids`) when the deployment's auto-preview alias needs to chain more than one proxy rule set — for example a Stripe webhook rule set followed by an AI proxy rule set:
+
+```yaml
+- uses: bffless/upload-artifact@v1
+  with:
+    path: dist
+    api-url: ${{ vars.ASSET_HOST_URL }}
+    api-key: ${{ secrets.ASSET_HOST_KEY }}
+    proxy-rule-set-names: stripe-webhook,ai-proxy
+```
+
+Semantics:
+
+- **Append + idempotent.** Each name/id is appended to whatever the alias already has. Re-running the workflow with the same list is a no-op — no duplicate join rows, no rule reordering.
+- **Order preserved on first attach.** The list order is the priority order in the rule merge — earlier entries win when two rule sets match the same request.
+- **Names resolve per-project.** Unknown names fail the deploy with a `400`; existing IDs that don't belong to the project are silently ignored at the rule-merge layer.
+- **Singular still works.** `proxy-rule-set-name` / `proxy-rule-set-id` remain supported as a back-compat shim. If both singular and plural are provided, the plural list wins and the singular value is ignored.
+
+If you need full replacement (drop all existing rule sets and set exactly this list), do not use the action — use the `update_alias` API with the `proxyRuleSetIds` array instead. The action's deploy path is intentionally append-only so that rule sets added through other channels (admin UI, scripts) are never silently dropped by a workflow run.
 
 ## PR Comments
 
