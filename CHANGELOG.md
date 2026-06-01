@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0](https://github.com/bffless/skills/compare/skills-v1.7.0...skills-v1.8.0) (2026-06-01)
+
+
+### Features
+
+* document multiple proxy rule sets on upload-artifact ([506bfdf](https://github.com/bffless/skills/commit/506bfdffc0af65402dc8830a1865480e5c92822f))
+* document multiple proxy rule sets on upload-artifact ([9a5c943](https://github.com/bffless/skills/commit/9a5c943c5030a00763bb366b5edfe94f8ba62778))
+
+
+### Bug Fixes
+
+* base path skills ([619b4e2](https://github.com/bffless/skills/commit/619b4e26d682c7dfa6bcabc635d2c25c0ce92be7))
+
 ## [1.7.0](https://github.com/bffless/skills/compare/skills-v1.6.0...skills-v1.7.0) (2026-05-26)
 
 
