@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/bffless/skills/compare/skills-v1.8.0...skills-v1.8.1) (2026-06-03)
+
+
+### Documentation
+
+* **authentication:** fix common bugs and add local-dev + logout patterns ([32b2efc](https://github.com/bffless/skills/commit/32b2efc995a24af093b509d174aa0eb335c91f67))
+* **authentication:** fix common bugs and add local-dev + logout patterns ([7fdb466](https://github.com/bffless/skills/commit/7fdb4668946f686ed256c93c7d8d7f7d8e4be6a5))
+
 ## [1.8.0](https://github.com/bffless/skills/compare/skills-v1.7.0...skills-v1.8.0) (2026-06-01)
 
 
