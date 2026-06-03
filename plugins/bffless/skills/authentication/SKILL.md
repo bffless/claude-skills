@@ -52,10 +52,22 @@ All auth endpoints are available at `/_bffless/auth/*` on any domain served by B
 
 | Endpoint                    | Method | Purpose                                                  |
 | --------------------------- | ------ | -------------------------------------------------------- |
-| `/_bffless/auth/session`    | GET    | Check current session (returns user info or 401)         |
+| `/_bffless/auth/session`    | GET    | Check current session — see response shape below         |
 | `/_bffless/auth/refresh`    | POST   | Refresh an expired access token using the refresh cookie |
 | `/_bffless/auth/callback`   | GET    | Exchange a domain relay token for auth cookies           |
 | `/_bffless/auth/logout`     | POST   | Clear auth cookies                                       |
+
+### Session Endpoint Response Shape
+
+`GET /_bffless/auth/session` has **three** possible outcomes — make sure your client distinguishes all three:
+
+| Outcome | Status | Body | Meaning |
+| ------- | ------ | ---- | ------- |
+| Logged in | `200` | `{ "authenticated": true, "user": { id, email, role } }` | Use the user object |
+| **Guest** | **`200`** | **`{ "authenticated": false, "user": null }`** | **Not logged in — do NOT trust `res.ok` alone** |
+| Expired | `401` | `"try refresh token"` | Call `/_bffless/auth/refresh`, then retry session |
+
+**Common bug**: writing `if (res.ok) return res.json()` and treating guests as authenticated. The body's `authenticated` field is the source of truth, not the HTTP status.
 
 ### Session Check Priority
 
@@ -73,36 +85,42 @@ If the access token is expired, it returns `401` with `"try refresh token"` to s
 Use a shared promise pattern to avoid duplicate session checks across components:
 
 ```typescript
-async function checkSession() {
+type Session =
+  | { authenticated: true; user: { id: string; email?: string; role?: string } }
+  | { authenticated: false };
+
+async function checkSession(): Promise<Session> {
   // Reuse shared session promise so multiple components don't duplicate requests
   if (!(window as any).__bfflessSession) {
-    (window as any).__bfflessSession = (async () => {
-      const res = await fetch('/_bffless/auth/session', { credentials: 'include' });
-      if (res.ok) return res.json();
+    (window as any).__bfflessSession = (async (): Promise<Session> => {
+      const get = () => fetch('/_bffless/auth/session', { credentials: 'include' });
 
+      let res = await get();
       if (res.status === 401) {
-        // Token expired — try refreshing
+        // Token expired — try refreshing, then retry the session check
         const refreshRes = await fetch('/_bffless/auth/refresh', {
           method: 'POST',
           credentials: 'include',
         });
-        if (refreshRes.ok) {
-          // Retry session check with new token
-          const retryRes = await fetch('/_bffless/auth/session', { credentials: 'include' });
-          if (retryRes.ok) return retryRes.json();
-        }
+        if (refreshRes.ok) res = await get();
       }
-      return null;
-    })().catch(() => null);
+
+      if (!res.ok) return { authenticated: false };
+
+      // IMPORTANT: a 200 can still be a guest — the body decides.
+      const body = await res.json();
+      if (body?.authenticated === false || body?.user == null) {
+        return { authenticated: false };
+      }
+      return { authenticated: true, user: body.user ?? body };
+    })().catch(() => ({ authenticated: false }) as Session);
   }
 
   return (window as any).__bfflessSession;
 }
-
-// Returns: { authenticated: true, user: { id, email, role } } or null
 ```
 
-The flow is: session check → if 401, refresh token → retry session check. This handles the common case where the access token has expired but the refresh token is still valid.
+The flow is: session check → if 401, refresh and retry → inspect `body.authenticated`. Do NOT treat any 200 as authenticated; the guest response is also a 200 (see the response shape table above).
 
 ### Redirecting to Login
 
@@ -110,7 +128,11 @@ When unauthenticated, redirect the user to the admin login with relay params. Us
 
 ```typescript
 function getLoginUrl(adminLoginUrl: string, redirectPath: string): string {
-  const targetDomain = window.location.hostname;
+  // Use `host`, NOT `hostname` — host includes the port (e.g. `localhost:5173`).
+  // Using `hostname` strips the port, and the backend builds a callback URL
+  // like `https://localhost/_bffless/auth/callback?...` (no port, wrong scheme)
+  // which is unreachable in local dev.
+  const targetDomain = window.location.host;
   const params = new URLSearchParams({
     customDomainRelay: 'true',
     targetDomain,
@@ -131,9 +153,35 @@ if (!session) {
 
 ### Logout
 
+Logout is symmetric to login: the admin domain owns the SuperTokens session, so you have to bounce through it to actually revoke. Calling `/_bffless/auth/logout` on its own is **not enough** on workspace subdomains — see the dedicated troubleshooting entry below.
+
 ```typescript
-await fetch('/_bffless/auth/logout', { method: 'POST', credentials: 'include' });
+async function logout(adminLogoutUrl: string) {
+  // 1. Clear the bffless_access / bffless_refresh cookies that live on this
+  //    domain. No-op on workspace subdomains (those cookies are never set
+  //    there), but required for custom domains.
+  try {
+    await fetch('/_bffless/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch {
+    // ignore — the admin bounce below is the source of truth
+  }
+
+  // 2. Bounce through the admin logout page so SuperTokens revokes the
+  //    session and clears `sAccessToken` on the parent domain. The admin
+  //    page validates `redirect` (same base-domain only) and sends the
+  //    user back.
+  const redirect = window.location.origin + window.location.pathname;
+  window.location.href = `${adminLogoutUrl}?redirect=${encodeURIComponent(redirect)}`;
+}
+
+// Example:
+// logout('https://admin.console.bffless.app/logout');
 ```
+
+Mirrors the login flow — same admin URL pattern, just `/logout` instead of `/login`. If you derive both URLs from a single env var, do it explicitly rather than munging the login URL with regex, so the intent is obvious to the next reader.
 
 ### Updating UI Based on Auth State (Header example)
 
@@ -150,6 +198,87 @@ window.__bfflessSession.then((data) => {
   }
 });
 ```
+
+## Local Development
+
+There is no auth backend running on `localhost`, so `/_bffless/auth/*` 404s out of the box. There are two patterns for working around this:
+
+### 1. Proxy `/_bffless` to a deployed workspace (real auth)
+
+Best when you want to exercise the real cookie/relay flow. Configure your dev server to proxy `/_bffless` (and usually `/api`) to a real BFFless deployment:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': { target: 'https://yourworkspace.bffless.app', changeOrigin: true },
+      '/_bffless': { target: 'https://yourworkspace.bffless.app', changeOrigin: true },
+    },
+  },
+});
+```
+
+Caveats:
+- Login redirects you to the admin domain. The `targetDomain` you send must be a registered domain in that workspace — `localhost:5173` will get rejected with "Domain not registered" unless an admin adds it (or you point at a workspace that does). Most teams add their dev host to a sandbox workspace's domain mappings for this purpose.
+- The session endpoint will return the **guest** shape (`200 { authenticated: false, user: null }`) until you complete the login + callback round trip, which is why the body-inspection pattern above is required.
+
+### 2. Mock `/_bffless/auth/*` with MSW (no backend)
+
+Best when you want to iterate on auth-gated UI without leaving localhost. [MSW](https://mswjs.io) intercepts at the service-worker layer so the production `fetch` calls stay untouched:
+
+```ts
+// src/mocks/handlers.ts
+import { http, HttpResponse, passthrough } from 'msw';
+
+const STORAGE_KEY = 'bffless:mockAuth';
+
+function readMock() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); }
+  catch { return {}; }
+}
+
+export const handlers = [
+  http.get('/_bffless/auth/session', () => {
+    const m = readMock();
+    if (!m.enabled) return passthrough();
+    if (!m.authenticated) {
+      return HttpResponse.json({ authenticated: false, user: null });
+    }
+    return HttpResponse.json({ authenticated: true, user: m.user });
+  }),
+  http.post('/_bffless/auth/refresh', () => {
+    const m = readMock();
+    if (!m.enabled) return passthrough();
+    return new HttpResponse(null, { status: m.authenticated ? 200 : 401 });
+  }),
+  http.post('/_bffless/auth/logout', () => {
+    const m = readMock();
+    if (!m.enabled) return passthrough();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...m, authenticated: false }));
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+```
+
+Then boot the worker only in dev, before render:
+
+```ts
+// src/main.tsx
+async function enableMocks() {
+  if (!import.meta.env.DEV) return;
+  const { setupWorker } = await import('msw/browser');
+  const { handlers } = await import('./mocks/handlers');
+  await setupWorker(...handlers).start({ onUnhandledRequest: 'bypass' });
+}
+enableMocks().then(() => { /* createRoot(...).render(...) */ });
+```
+
+Add a small dev-only panel (rendered when `import.meta.env.DEV`) that writes `{ enabled, authenticated, user }` to localStorage and dispatches a `CustomEvent` so your session hook can refetch. With this setup you can toggle authed/guest and swap user attributes live without restarting the dev server.
+
+Caveats:
+- Returning `passthrough()` when `enabled === false` lets you fall back to a proxied real backend (pattern #1) on demand.
+- MSW requires `public/mockServiceWorker.js`; generate it once with `npx msw init public/ --save`.
 
 ## Auth Flow Diagram
 
@@ -202,3 +331,13 @@ Custom Domain Flow:
 
 - If the workspace has a promoted domain (e.g., `console.bffless.app`), use `admin.console.bffless.app`, NOT `admin.console.workspace.bffless.app`
 - The workspace subdomain format still works but the promoted domain is cleaner
+
+**Logout returns 200 "Logged out successfully" but the next session check still returns `authenticated: true`?**
+
+This is the most-reported logout footgun. It means you called `/_bffless/auth/logout` alone:
+
+- `/_bffless/auth/logout` only clears the **custom-domain JWT cookies** (`bffless_access`, `bffless_refresh`).
+- The session endpoint falls back to the **SuperTokens session** (`sAccessToken`) when no `bffless_access` cookie is present. That cookie lives on the parent domain (`.bffless.app` / `.yourdomain.com`) and was set by the admin login — it is not cleared by `/_bffless/auth/logout`.
+- On workspace subdomains the `bffless_access` cookie was never set in the first place, so `/_bffless/auth/logout` is effectively a no-op and the SuperTokens fallback re-authenticates the user immediately.
+
+Fix: after the `/_bffless/auth/logout` call, navigate to `admin.<workspace>/logout?redirect=<current-page>`. The admin page calls SuperTokens `signOut()`, which revokes the session and clears the shared cookie, then redirects back. See the [Logout](#logout) section for the full pattern.
