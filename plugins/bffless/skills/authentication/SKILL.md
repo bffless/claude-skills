@@ -5,46 +5,57 @@ description: Cross-domain authentication using the admin login relay pattern, bu
 
 # Authentication
 
-BFFless uses a cross-domain authentication relay pattern. Users authenticate at the workspace's admin domain (`admin.<workspace>`) and are relayed back to the content domain with auth cookies. Auth endpoints on the content domain are accessed via the **built-in `/_bffless/auth/*` endpoints** — no proxy rules required.
+BFFless authenticates users on a single admin host (`admin.<primary-domain>`) and reuses that session across every site it serves. For the common case — a primary domain plus its subdomains — the SuperTokens session cookie (`sAccessToken`) is shared on `.<primary-domain>` and works directly. For the edge case of additional cross-origin custom domains, BFFless relays the session into a per-domain `bffless_access` JWT via a one-time bounce through the admin. Both cases expose the same content-side surface at `/_bffless/auth/*` — built into BFFless nginx, no proxy rules required.
 
 ## How Authentication Works
 
-### Workspace Subdomains
+### The Common Case: Primary Domain (+ Subdomains)
 
-For workspace subdomains (e.g., `myalias.sandbox.workspace.bffless.app`), SuperTokens session cookies (`sAccessToken`) work directly because they share the parent domain.
+A self-hosted BFFless install has **one primary domain** (e.g., `foo.com` — the root you pick during setup). The admin lives at `admin.foo.com` and content can be served from `foo.com` itself or any subdomain (`bar.foo.com`, `app.foo.com`, etc.). Almost every install runs entirely in this mode.
 
-When a user visits a private deployment and isn't authenticated:
+All of these share `.foo.com` as a parent, so the SuperTokens session cookie (`sAccessToken`) reaches every one of them automatically. There is no `bffless_access` cookie in this mode — the session is always validated against `sAccessToken`. (BFFless multi-tenant hosting at `*.workspace.bffless.app` is mechanically the same setup, with `workspace.bffless.app` playing the role of the primary domain.)
 
-1. Backend redirects to `https://admin.<workspace>/login?redirect=<original-path>&tryRefresh=true`
-2. The login page attempts a session refresh first (the `tryRefresh` param)
+When a user hits a private deployment on the primary domain and isn't authenticated:
+
+1. Backend redirects to `https://admin.foo.com/login?redirect=<original-path>&tryRefresh=true`
+2. The login page tries a session refresh first (the `tryRefresh` param), in case the cookie is just expired
 3. If refresh fails, the user logs in normally
 4. After login, the user is redirected back to the original path
-5. The `sAccessToken` cookie is valid across all subdomains of the workspace
+5. The `sAccessToken` cookie now travels with every request to either the content or admin host
 
-### Custom Domains (customDomainRelay)
+### Edge Case: Additional Cross-Origin Custom Domains (`customDomainRelay`)
 
-For custom domains (e.g., `www.bffless.com`), SuperTokens cookies don't work because they're on a completely different domain. BFFless uses a **domain relay** flow:
+A single BFFless install can also serve content from **additional registered domains** that aren't under the primary — e.g., attaching `bat.com` to a `foo.com` install. This is uncommon for OSS users; reach for it only when you genuinely need to serve content from a separately-owned root domain.
 
-1. User visits a private page on `www.bffless.com/portal/`
-2. Frontend detects the user is not authenticated (via `/_bffless/auth/session`)
+Because `bat.com` and `foo.com` are different origins, the SuperTokens cookie can't reach `bat.com`. SuperTokens itself has no multi-domain cookie support, so BFFless mints its own short-lived JWT and sets it as `bffless_access` on `bat.com` via a one-time relay through `admin.foo.com`. The `bffless_access` cookie **only exists on these cross-origin custom domains** — it is never set on the primary or any of its subdomains.
+
+The relay flow:
+
+1. User visits a private page on `bat.com/portal/`
+2. Frontend detects no auth (via `/_bffless/auth/session`)
 3. Frontend redirects to the admin login with relay params:
    ```
-   https://admin.console.bffless.app/login?customDomainRelay=true&targetDomain=www.bffless.com&redirect=%2Fportal%2F
+   https://admin.foo.com/login?customDomainRelay=true&targetDomain=bat.com&redirect=%2Fportal%2F
    ```
 4. User logs in on the admin domain (or is already logged in via SuperTokens session)
 5. After login, the frontend calls `POST /api/auth/domain-token` with:
    ```json
-   { "targetDomain": "www.bffless.com", "redirectPath": "/portal/" }
+   { "targetDomain": "bat.com", "redirectPath": "/portal/" }
    ```
-6. Backend validates that `targetDomain` is a registered domain for this workspace, then creates a short-lived JWT (the "domain token")
-7. Backend returns a `redirectUrl` pointing to the callback on the custom domain: `https://www.bffless.com/_bffless/auth/callback?token=...&redirect=/portal/`
+6. Backend validates that `targetDomain` is a registered domain for this workspace, then mints a short-lived JWT (the "domain token")
+7. Backend returns a `redirectUrl` pointing to the callback on the content domain: `https://bat.com/_bffless/auth/callback?token=...&redirect=/portal/`
 8. The callback endpoint validates the token, sets `bffless_access` and `bffless_refresh` HttpOnly cookies, and redirects to the original path
 
-### Important: Use `/_bffless/auth/*`, NOT `/api/auth/*`
+### Default: Use `/_bffless/auth/*`
 
-The `/_bffless/auth/*` endpoints are **built into BFFless nginx** and handled by a dedicated controller. They are separate from the SuperTokens `/api/auth/*` endpoints. Do NOT use `/api/auth/*` on custom domains — those are SuperTokens endpoints that use different cookies (`sAccessToken`) which are not set by the domain relay flow.
+The `/_bffless/auth/*` endpoints are **built into BFFless nginx** and handled by a dedicated controller — they work on every domain without any configuration. They are separate from the SuperTokens `/api/auth/*` endpoints (which only exist on the admin host).
 
-The domain relay callback sets `bffless_access` and `bffless_refresh` cookies, which are only recognized by the `/_bffless/auth/*` endpoints. Using `/api/auth/session` instead of `/_bffless/auth/session` will cause a redirect loop because the SuperTokens session check won't find the `bffless_access` cookie.
+Reach for `/_bffless/auth/*` first. The two situations where it isn't enough are:
+
+- You need to **clear the SuperTokens session** (true logout) on the primary domain or one of its subdomains.
+- You need an endpoint not in the built-in surface (OAuth start/callback, `session/refresh`, etc.).
+
+For those, set up the [reverse-proxy rule](#advanced-reverse-proxy-to-supertokens-endpoints) and call the proxied `/auth/*` path. The proxy only works on the primary domain (the SuperTokens cookie has to reach the request). On an additional cross-origin custom domain like `bat.com`, stick with `/_bffless/auth/*`.
 
 ## Auth Endpoints (Built-in)
 
@@ -55,7 +66,15 @@ All auth endpoints are available at `/_bffless/auth/*` on any domain served by B
 | `/_bffless/auth/session`    | GET    | Check current session — see response shape below         |
 | `/_bffless/auth/refresh`    | POST   | Refresh an expired access token using the refresh cookie |
 | `/_bffless/auth/callback`   | GET    | Exchange a domain relay token for auth cookies           |
-| `/_bffless/auth/logout`     | POST   | Clear auth cookies                                       |
+| `/_bffless/auth/logout`     | POST   | Clear `bffless_access` / `bffless_refresh` cookies (does NOT clear SuperTokens session — see [Advanced](#advanced-reverse-proxy-to-supertokens-endpoints)) |
+| `/_bffless/auth/signin`     | POST   | In-page email+password sign-in (mints `bffless_access`)  |
+| `/_bffless/auth/signup`     | POST   | In-page email+password sign-up                           |
+| `/_bffless/auth/forgot-password` | POST | Trigger password-reset email                          |
+| `/_bffless/auth/reset-password`  | POST | Complete password reset with token                    |
+| `/_bffless/auth/verify-email`    | POST | Verify email with token                               |
+| `/_bffless/auth/send-verification-email` | POST | Resend the verification email             |
+| `/_bffless/auth/login-methods`   | GET  | Enabled auth providers / signup gates                 |
+| `/_bffless/auth/check-email`     | POST | Test if an email exists in the workspace              |
 
 ### Session Endpoint Response Shape
 
@@ -73,10 +92,83 @@ All auth endpoints are available at `/_bffless/auth/*` on any domain served by B
 
 The `/_bffless/auth/session` endpoint checks auth in this order:
 
-1. **`bffless_access` cookie** — custom domain JWT issued by the callback flow
-2. **`sAccessToken` cookie** — SuperTokens session (fallback for workspace subdomains)
+1. **`bffless_access` cookie** — domain-relay JWT issued by the callback flow (cross-origin custom domains)
+2. **`sAccessToken` cookie** — SuperTokens session (fallback for shared-parent topologies: primary domain & enterprise workspace subdomains)
 
 If the access token is expired, it returns `401` with `"try refresh token"` to signal the client should call `/_bffless/auth/refresh`.
+
+## Advanced: Reverse-Proxy to SuperTokens Endpoints
+
+The built-in `/_bffless/auth/*` controller covers the read path (`session`) and the in-page sign-in / sign-up / password-reset flows, but it is **not a complete proxy to the underlying SuperTokens routes**. Two things specifically are missing:
+
+1. **It can't clear the SuperTokens session.** `/_bffless/auth/logout` only deletes the `bffless_access` / `bffless_refresh` cookies that were minted by the domain-relay callback. The real `sAccessToken` cookie lives on the parent admin domain (`.bffless.app`, `.yourdomain.com`) and is managed by SuperTokens' `signOut()`. There's no built-in endpoint on the content domain that can revoke it.
+2. **It exposes a curated subset of endpoints.** OAuth callbacks, provider lists (`/api/auth/oauth/*`), `session/refresh` (the SuperTokens-format refresh, distinct from `/_bffless/auth/refresh`), and a few other internal routes are only available under the admin's `/api/auth/*` namespace.
+
+When you need any of these from a content domain, set up a **reverse proxy rule** from a prefix path on the content domain to the admin backend's `/api/auth` namespace. This is the same pattern the admin UI itself uses.
+
+### The Proxy Rule (canonical example)
+
+For a workspace whose admin lives at `admin.<workspace>`, add an **External Proxy** rule to the content alias:
+
+| Field                       | Value                                          |
+| --------------------------- | ---------------------------------------------- |
+| Path Pattern                | `/auth/*` (or `/api/auth/*` — choose one)      |
+| Method                      | Any                                            |
+| Rule Type                   | External Proxy                                 |
+| Target URL                  | `http://localhost:3000/api/auth` (same-instance backend) **or** `https://admin.<workspace>/api/auth` (cross-instance) |
+| Strip matched path prefix   | ON                                             |
+| Preserve original Host      | OFF                                            |
+| Forward cookies to target   | **ON** (required — the session cookie has to travel with the request) |
+
+`localhost:3000` is the internal CE backend on the same node; BFFless allows HTTP targets only for `*.svc` / `localhost`. For cross-instance setups, point at the admin's HTTPS URL.
+
+With the rule above:
+
+```
+GET  j5s.dev/auth/session    →  http://localhost:3000/api/auth/session
+POST j5s.dev/auth/signout    →  http://localhost:3000/api/auth/signout
+GET  j5s.dev/auth/oauth/...  →  http://localhost:3000/api/auth/oauth/...
+```
+
+### Response Shape Differs From `_bffless/auth/session`
+
+The proxied SuperTokens session endpoint returns a **richer object** than the BFFless one — both `emailVerified` and the session handle, with `user: null` instead of `authenticated: false` for guests:
+
+```json
+// GET /auth/session  (proxied to /api/auth/session)
+{
+  "session": { "userId": "...", "handle": "..." },
+  "user":    { "id": "...", "email": "...", "role": "admin" },
+  "emailVerified": true,
+  "emailVerificationRequired": false
+}
+```
+
+Compare with the BFFless built-in (covered above):
+
+```json
+// GET /_bffless/auth/session
+{ "authenticated": true, "user": { "id": "...", "email": "...", "role": "admin" } }
+```
+
+Pick one shape per client and stick with it; mixing causes the same "treated guest as authed" bug described earlier. If you need `emailVerified` on the content domain, use the proxied endpoint.
+
+### When to Use Each
+
+| Need                                                 | Use                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| Cheap session check, no SuperTokens dep              | `/_bffless/auth/session`                                   |
+| In-page sign-in / sign-up / forgot-password dialog   | `/_bffless/auth/signin` etc. (works on true custom domains too) |
+| Custom-domain relay callback                         | `/_bffless/auth/callback` (built-in, can't be proxied)     |
+| **Clearing the SuperTokens session** (real logout)   | Proxied `/auth/signout` **or** bounce through `admin.<workspace>/logout` (see [Logout](#logout)) |
+| OAuth / SSO flows started from the content domain    | Proxied `/auth/oauth/*`                                    |
+| `emailVerified`, session handle, pending invitations | Proxied `/auth/session`                                    |
+
+### Caveat: This Only Works When the Cookie Reaches the Proxy
+
+The reverse-proxy approach depends on the browser sending the SuperTokens session cookie to the content domain so BFFless can forward it. That works on the **primary domain and its subdomains** (`foo.com`, `bar.foo.com`, …) because `sAccessToken` is on `.foo.com`. It also works on `*.workspace.bffless.app` since that is mechanically the same setup.
+
+It does **not** work on additional cross-origin custom domains (a `bat.com` attached to a `foo.com` install): the `sAccessToken` cookie never reaches `bat.com`, so the proxy has nothing to forward. Use `_bffless/auth/*` + the admin-bounce logout on those.
 
 ## Frontend Integration
 
@@ -124,7 +216,7 @@ The flow is: session check → if 401, refresh and retry → inspect `body.authe
 
 ### Redirecting to Login
 
-When unauthenticated, redirect the user to the admin login with relay params. Use the **promoted admin domain** (e.g., `admin.console.bffless.app`), not the full workspace subdomain:
+When unauthenticated, redirect the user to the admin on the **primary domain** (e.g., `admin.foo.com`):
 
 ```typescript
 function getLoginUrl(adminLoginUrl: string, redirectPath: string): string {
@@ -141,11 +233,11 @@ function getLoginUrl(adminLoginUrl: string, redirectPath: string): string {
   return `${adminLoginUrl}?${params.toString()}`;
 }
 
-// Example: redirect to admin login, then relay back to /portal/
+// Example: redirect to admin login on the primary domain, then relay back to /portal/
 const session = await checkSession();
 if (!session) {
   window.location.href = getLoginUrl(
-    'https://admin.console.bffless.app/login',
+    'https://admin.foo.com/login',
     '/portal/',
   );
 }
@@ -153,13 +245,15 @@ if (!session) {
 
 ### Logout
 
-Logout is symmetric to login: the admin domain owns the SuperTokens session, so you have to bounce through it to actually revoke. Calling `/_bffless/auth/logout` on its own is **not enough** on workspace subdomains — see the dedicated troubleshooting entry below.
+Logout is symmetric to login: the admin host owns the SuperTokens session, so on the primary domain (and its subdomains) you have to bounce through `admin.foo.com/logout` to actually revoke. Calling `/_bffless/auth/logout` on its own is **not enough** — it only clears `bffless_access`, which isn't even set on the primary domain. See the dedicated troubleshooting entry below.
+
+> **Alternative for the common case:** if you've configured the [reverse-proxy rule](#advanced-reverse-proxy-to-supertokens-endpoints) (e.g., `/auth/*` → admin `/api/auth`), you can `POST /auth/signout` directly from the content domain instead of bouncing through the admin page. The proxy forwards the SuperTokens session cookie and SuperTokens clears it on `.foo.com`. The admin-bounce below is the universal fallback (and the only option on additional cross-origin custom domains, where the proxy can't reach the cookie).
 
 ```typescript
 async function logout(adminLogoutUrl: string) {
   // 1. Clear the bffless_access / bffless_refresh cookies that live on this
-  //    domain. No-op on workspace subdomains (those cookies are never set
-  //    there), but required for custom domains.
+  //    domain. No-op on the primary domain (those cookies are never set
+  //    there), but required for additional cross-origin custom domains.
   try {
     await fetch('/_bffless/auth/logout', {
       method: 'POST',
@@ -178,7 +272,7 @@ async function logout(adminLogoutUrl: string) {
 }
 
 // Example:
-// logout('https://admin.console.bffless.app/logout');
+// logout('https://admin.foo.com/logout');
 ```
 
 Mirrors the login flow — same admin URL pattern, just `/logout` instead of `/login`. If you derive both URLs from a single env var, do it explicitly rather than munging the login URL with regex, so the intent is obvious to the next reader.
@@ -212,8 +306,8 @@ Best when you want to exercise the real cookie/relay flow. Configure your dev se
 export default defineConfig({
   server: {
     proxy: {
-      '/api': { target: 'https://yourworkspace.bffless.app', changeOrigin: true },
-      '/_bffless': { target: 'https://yourworkspace.bffless.app', changeOrigin: true },
+      '/api': { target: 'https://foo.com', changeOrigin: true },
+      '/_bffless': { target: 'https://foo.com', changeOrigin: true },
     },
   },
 });
@@ -283,12 +377,12 @@ Caveats:
 ## Auth Flow Diagram
 
 ```
-Custom Domain Flow:
+Additional Custom Domain Flow (edge case):
 ┌──────────────────┐     JS redirect        ┌──────────────────────────┐
-│  www.bffless.com │ ──────────────────→    │  admin.<workspace>/login │
+│  bat.com         │ ──────────────────→    │  admin.foo.com/login     │
 │  (private page)  │  customDomainRelay=    │  ?customDomainRelay=true │
-│                  │  true&targetDomain=    │  &targetDomain=www...    │
-└──────────────────┘  www.bffless.com       └────────────┬─────────────┘
+│                  │  true&targetDomain=    │  &targetDomain=bat.com   │
+└──────────────────┘  bat.com               └────────────┬─────────────┘
         ▲                                                │
         │                                     User logs in (SuperTokens)
         │                                                │
@@ -298,7 +392,7 @@ Custom Domain Flow:
         │                                                │
         │              302 redirect                      │
         │  ←─────────────────────────────────────────────┘
-        │  to: www.bffless.com/_bffless/auth/callback?token=...
+        │  to: bat.com/_bffless/auth/callback?token=...
         │
         ▼
 ┌──────────────────┐
@@ -310,9 +404,9 @@ Custom Domain Flow:
 
 ## Troubleshooting
 
-**User gets stuck in a redirect loop?**
+**User gets stuck in a redirect loop on an additional custom domain (e.g., `bat.com`)?**
 
-- **Most common cause:** Using `/api/auth/session` instead of `/_bffless/auth/session`. The domain relay callback sets `bffless_access` cookies which are only recognized by `/_bffless/auth/*` endpoints. The `/api/auth/*` endpoints check SuperTokens cookies (`sAccessToken`) which are NOT set by the domain relay flow.
+- **Most common cause:** Calling `/api/auth/session` instead of `/_bffless/auth/session`. The relay flow sets `bffless_access`, which only `/_bffless/auth/*` recognizes — and `/api/auth/*` doesn't even exist on `bat.com` without a reverse-proxy rule (which wouldn't help anyway, since the `sAccessToken` cookie can't reach `bat.com`).
 - Verify the custom domain is registered in `domain_mappings` with `isActive = true`
 - Ensure cookies are being set (requires HTTPS for `Secure` flag)
 
@@ -323,21 +417,14 @@ Custom Domain Flow:
 
 **Session check returns 401 but user just logged in?**
 
-- On custom domains: verify the `/_bffless/auth/callback` was reached and cookies were set
-- On workspace subdomains: verify `COOKIE_DOMAIN` is configured for cross-subdomain cookie sharing
+- On the primary domain or one of its subdomains: verify `COOKIE_DOMAIN` is set to `.foo.com` so `sAccessToken` is shared across them
+- On an additional cross-origin custom domain (`bat.com` attached to a `foo.com` install): verify the `/_bffless/auth/callback` was reached and `bffless_access` was set
 - Check that the `bffless_access` or `sAccessToken` cookie is present in the request
-
-**Admin login URL — use promoted domain, not workspace subdomain:**
-
-- If the workspace has a promoted domain (e.g., `console.bffless.app`), use `admin.console.bffless.app`, NOT `admin.console.workspace.bffless.app`
-- The workspace subdomain format still works but the promoted domain is cleaner
 
 **Logout returns 200 "Logged out successfully" but the next session check still returns `authenticated: true`?**
 
-This is the most-reported logout footgun. It means you called `/_bffless/auth/logout` alone:
+This is the most-reported logout footgun on the primary domain. `/_bffless/auth/logout` only clears `bffless_access` / `bffless_refresh`, but on the primary domain those cookies never existed — the session is in `sAccessToken` on `.foo.com`, which `/_bffless/auth/logout` cannot touch.
 
-- `/_bffless/auth/logout` only clears the **custom-domain JWT cookies** (`bffless_access`, `bffless_refresh`).
-- The session endpoint falls back to the **SuperTokens session** (`sAccessToken`) when no `bffless_access` cookie is present. That cookie lives on the parent domain (`.bffless.app` / `.yourdomain.com`) and was set by the admin login — it is not cleared by `/_bffless/auth/logout`.
-- On workspace subdomains the `bffless_access` cookie was never set in the first place, so `/_bffless/auth/logout` is effectively a no-op and the SuperTokens fallback re-authenticates the user immediately.
+Fix: either configure the [reverse-proxy rule](#advanced-reverse-proxy-to-supertokens-endpoints) and `POST /auth/signout` directly, or navigate to `admin.foo.com/logout?redirect=<current-page>`. The admin page calls SuperTokens `signOut()`, which revokes the session and clears the shared cookie, then redirects back. See the [Logout](#logout) section for the full pattern.
 
-Fix: after the `/_bffless/auth/logout` call, navigate to `admin.<workspace>/logout?redirect=<current-page>`. The admin page calls SuperTokens `signOut()`, which revokes the session and clears the shared cookie, then redirects back. See the [Logout](#logout) section for the full pattern.
+On a cross-origin custom domain (`bat.com`) `/_bffless/auth/logout` actually does clear the relevant cookies (`bffless_access` / `bffless_refresh`) — no admin bounce required there.
