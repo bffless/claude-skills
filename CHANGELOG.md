@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2](https://github.com/bffless/skills/compare/skills-v1.8.1...skills-v1.8.2) (2026-06-03)
+
+
+### Documentation
+
+* **authentication:** document reverse-proxy escape hatch + primary-domain framing ([f3b88ed](https://github.com/bffless/skills/commit/f3b88ede963167798125faef049d76272c8ab7f0))
+* **authentication:** document reverse-proxy to SuperTokens for advanced cases ([187d128](https://github.com/bffless/skills/commit/187d12891b5076f007688ecfe712a415e7e3de16))
+
 ## [1.8.1](https://github.com/bffless/skills/compare/skills-v1.8.0...skills-v1.8.1) (2026-06-03)
 
 
