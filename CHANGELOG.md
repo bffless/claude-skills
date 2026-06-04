@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.3](https://github.com/bffless/skills/compare/skills-v1.8.2...skills-v1.8.3) (2026-06-04)
+
+
+### Documentation
+
+* **authentication:** don't use customDomainRelay for the primary domain ([7c99672](https://github.com/bffless/skills/commit/7c99672181bcab8d4c3f9637c92dd83a7c6ee412))
+* **authentication:** don't use customDomainRelay for the primary domain ([e5e0581](https://github.com/bffless/skills/commit/e5e058189090033b9b1d1b25e7f790e4d2b13b42))
+* **pipelines:** require multi-line indented handler code via MCP ([f73c05e](https://github.com/bffless/skills/commit/f73c05e8c9b4f2e36c8224e485a1c54ef9b83a90))
+
 ## [1.8.2](https://github.com/bffless/skills/compare/skills-v1.8.1...skills-v1.8.2) (2026-06-03)
 
 
