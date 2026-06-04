@@ -141,6 +141,36 @@ Both support conditions to selectively apply (e.g., only rate limit POST request
 3. Vector Search → find similar records
 4. Response → return results
 
+## Authoring Handler Code via MCP
+
+When you create or update a pipeline through the MCP, the `code` string inside `function_handler.config` and the `body` template inside `response_handler.config` are stored verbatim and displayed verbatim in the admin UI (e.g. `https://admin.j5s.dev/repo/<owner>/<project>/proxy-rules/<setId>/<ruleId>`). The UI does not reformat them.
+
+**Always emit multi-line, indented source — never a minified one-liner.**
+
+- Use real newlines (`\n` in the JSON payload) between statements.
+- Indent with 2 spaces.
+- Put one statement per line; don't chain multiple statements onto one line with semicolons.
+- This applies to any non-trivial `function_handler` body and any `response_handler` body template longer than one expression.
+- One-line `function handler() { return {}; }` is fine for true one-liners; everything else should be expanded.
+
+`function_handler` runs in a sandboxed VM: **no** `crypto`, `Buffer`, `require`, `process`, or `fetch`. Use `Math.random()` for randomness, and prefer `var` over `const`/`let` (data_query results may be frozen, and `var` avoids TDZ surprises in the sandbox).
+
+Bad (do not submit code like this):
+
+```json
+{ "code": "function handler({ request }) { var h = request.headers || {}; var ip = (h['x-forwarded-for']||'').split(',')[0].trim() || 'unknown'; return { ip: ip }; }" }
+```
+
+Good:
+
+```json
+{
+  "code": "function handler({ request }) {\n  var headers = (request && request.headers) || {};\n  var xff = headers['x-forwarded-for'] || '';\n\n  var firstIp = '';\n  if (typeof xff === 'string' && xff.length > 0) {\n    var parts = xff.split(',');\n    firstIp = parts[0] ? parts[0].trim() : '';\n  }\n\n  return {\n    ip: firstIp || 'unknown',\n  };\n}\n"
+}
+```
+
+The user opens these rules in the admin UI to review and edit them later. A wall-of-text `code` field forces them to manually reformat before they can read it — treat unformatted handler code the same as committing a minified file to the repo.
+
 ## Configuration Tips
 
 1. Name handlers descriptively for readable expressions
@@ -148,6 +178,7 @@ Both support conditions to selectively apply (e.g., only rate limit POST request
 3. Test with simple inputs before adding validation
 4. Check pipeline logs for debugging failed executions
 5. Use `postSteps` for async work after the response is sent (e.g., sending emails)
+6. Format `function_handler` code and non-trivial `response_handler` bodies as multi-line, indented source — see "Authoring Handler Code via MCP" above
 
 ## Troubleshooting
 
