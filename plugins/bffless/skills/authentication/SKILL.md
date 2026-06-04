@@ -216,30 +216,62 @@ The flow is: session check → if 401, refresh and retry → inspect `body.authe
 
 ### Redirecting to Login
 
-When unauthenticated, redirect the user to the admin on the **primary domain** (e.g., `admin.foo.com`):
+When an unauthenticated user needs to sign in, send them to the admin login on the **primary domain** (`admin.foo.com`) and tell it where to return them. **How you encode "where to return" depends on the topology — and the two cases are not interchangeable.**
+
+> **Do not reach for `customDomainRelay` by default.** It is only for additional cross-origin custom domains (see the second helper below). Adding it for the primary domain or one of its subdomains is wrong: the relay is unnecessary there (the `sAccessToken` cookie already reaches the host), it sets a redundant `bffless_access` cookie, and the new-user **sign-up** bounce drops the relay params — so signups get stranded on `admin.foo.com`. Use the no-relay helper for anything under your primary domain.
+
+#### Common case: primary domain + subdomains (no relay)
+
+`sAccessToken` is shared on `.foo.com`, so you just need the admin to bounce the browser back to the content host. Pass an **absolute** return URL in `redirect` — a relative `redirect=/` is treated as relative to the admin and leaves the user stranded on `admin.foo.com`. The admin validates the URL is within the same base domain before honoring it, then does a full-page navigation back so the shared cookie authenticates on arrival.
 
 ```typescript
-function getLoginUrl(adminLoginUrl: string, redirectPath: string): string {
+function getLoginUrl(adminLoginUrl: string, redirectPath = '/'): string {
+  // Absolute URL back to THIS host. `origin` includes scheme + host + port,
+  // so it survives local dev. Without it, `redirect=/` lands the user on
+  // admin.foo.com instead of coming back here.
+  const returnTo = window.location.origin + redirectPath;
+  const params = new URLSearchParams({ redirect: returnTo });
+  return `${adminLoginUrl}?${params.toString()}`;
+}
+
+// Example: from app.foo.com, bounce through the admin and come back to /portal/
+const session = await checkSession();
+if (!session.authenticated) {
+  window.location.href = getLoginUrl('https://admin.foo.com/login', '/portal/');
+  // → https://admin.foo.com/login?redirect=https%3A%2F%2Fapp.foo.com%2Fportal%2F
+}
+```
+
+#### Edge case: additional cross-origin custom domain (relay)
+
+Only when content lives on a **separately-owned root** (`bat.com` attached to a `foo.com` install) does the cookie fail to reach it, so you fall back to the relay. Note the `redirect` here is a **path**, not an absolute URL — the callback lives on `targetDomain`, and the admin builds `bat.com/_bffless/auth/callback?...&redirect=<path>` for you.
+
+```typescript
+function getCustomDomainLoginUrl(adminLoginUrl: string, redirectPath = '/'): string {
   // Use `host`, NOT `hostname` — host includes the port (e.g. `localhost:5173`).
   // Using `hostname` strips the port, and the backend builds a callback URL
   // like `https://localhost/_bffless/auth/callback?...` (no port, wrong scheme)
   // which is unreachable in local dev.
-  const targetDomain = window.location.host;
   const params = new URLSearchParams({
     customDomainRelay: 'true',
-    targetDomain,
-    redirect: redirectPath,
+    targetDomain: window.location.host,
+    redirect: redirectPath, // a PATH — the callback is served on targetDomain
   });
   return `${adminLoginUrl}?${params.toString()}`;
 }
+```
 
-// Example: redirect to admin login on the primary domain, then relay back to /portal/
-const session = await checkSession();
-if (!session) {
-  window.location.href = getLoginUrl(
-    'https://admin.foo.com/login',
-    '/portal/',
-  );
+`targetDomain` must be registered in the workspace (a `domain_mappings` entry, or a subdomain of `PRIMARY_DOMAIN`) or the `domain-token` mint is rejected. After login the admin relays through `POST /api/auth/domain-token` and redirects to `bat.com/_bffless/auth/callback`, which sets `bffless_access`.
+
+#### Picking between them
+
+```typescript
+function loginUrlFor(adminLoginUrl: string, primaryDomain: string, redirectPath = '/') {
+  const host = window.location.hostname;
+  const underPrimary = host === primaryDomain || host.endsWith('.' + primaryDomain);
+  return underPrimary
+    ? getLoginUrl(adminLoginUrl, redirectPath)            // no relay
+    : getCustomDomainLoginUrl(adminLoginUrl, redirectPath); // relay
 }
 ```
 
@@ -414,6 +446,13 @@ Additional Custom Domain Flow (edge case):
 
 - The `targetDomain` must match a `domain_mappings` entry or be a subdomain of `PRIMARY_DOMAIN`
 - Check for www vs non-www mismatch
+
+**After login the user lands on `admin.foo.com` instead of the content site?**
+
+- Two causes, both in how the login link was built (see [Redirecting to Login](#redirecting-to-login)):
+  1. `redirect` was a relative path (`redirect=/`). The admin honors it relative to itself. Pass an **absolute** URL (`https://app.foo.com/...`) for the no-relay common case.
+  2. `customDomainRelay=true` was added for a subdomain of the primary domain. The relay is for cross-origin custom domains only; on a primary subdomain, drop it and use the absolute-URL `redirect` instead.
+- Same root cause strands **new sign-ups**: the relay params are not carried through the sign-up bounce, so a user who clicks "Sign up" from a relay login URL finishes on the admin. The no-relay helper avoids this entirely.
 
 **Session check returns 401 but user just logged in?**
 
