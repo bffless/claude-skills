@@ -27,7 +27,9 @@ Pipelines provide backend functionality for static sites without writing server 
 | **File Upload** | `file_upload_handler` | Upload files from forms or URLs to storage |
 | **File Serve** | `file_serve_handler` | Serve files from storage with Range request support |
 | **Image Convert** | `image_convert_handler` | Convert images between PNG/JPEG/WebP using sharp |
-| **Signed URL** | `signed_url` | Generate time-limited presigned URLs for storage files |
+| **Signed URL** | `signed_url` | Generate time-limited presigned URLs for downloading storage files |
+| **Presigned Upload** | `presigned_upload` | Issue a presigned URL so clients upload large files directly to the bucket (prepare) |
+| **Register Upload** | `register_upload` | Record a file that was uploaded directly to the bucket (finalize) |
 | **Replicate** | `replicate` | Call Replicate ML models (image gen, embeddings, etc.) |
 | **Embed Store** | `embed_store` | Store embedding vectors for semantic search |
 | **Vector Search** | `vector_search` | Query embeddings by cosine similarity |
@@ -67,13 +69,31 @@ Key config:
 
 ## File Handlers
 
-**Upload** (`file_upload_handler`): Handles multipart file uploads or downloads from URLs. Supports allowed MIME type filtering, max file size, optional image conversion, and date-bucketed storage.
+**Upload** (`file_upload_handler`): Handles multipart file uploads or downloads from URLs. Bytes are **proxied through the backend**, so this path is capped (10MB default `maxFileSize`, plus the server's `client_max_body_size`). Best for small files, server-side image conversion, and local storage. Supports allowed MIME type filtering, max file size, optional image conversion, and date-bucketed storage.
 
 **Serve** (`file_serve_handler`): Streams files from storage with HTTP Range support for video/audio playback. Config: `subDir`, `cacheMaxAge`.
 
 **Image Convert** (`image_convert_handler`): Converts between PNG, JPEG, WebP. Config: `inputPath`, `outputFormat`, `quality`.
 
-**Signed URL** (`signed_url`): Generates time-limited presigned URLs for private storage files. Config: `path`, `expiresIn` (seconds, default 3600).
+**Signed URL** (`signed_url`): Generates time-limited presigned URLs for **downloading** private storage files. Config: `path`, `expiresIn` (seconds, default 3600).
+
+### Direct-to-bucket uploads (large files)
+
+For files larger than the proxied limit, upload **directly to the storage bucket** with a presigned URL — the bytes never pass through nginx or the backend. This is a **two-step, two-pipeline** flow (the client uploads to the bucket between the steps):
+
+**Presigned Upload** (`presigned_upload`) — *prepare*: mints a presigned PUT URL. Config: `subDir`, `filename` (expression, default `request.body.filename`), `dateBucket`, `expiresIn`, `maxFileSize`, `allowedMimeTypes`. Output: `uploadUrl` (client PUTs the file here), `storageKey`, `publicPath`, `originalName`, `expiresAt`.
+
+**Register Upload** (`register_upload`) — *finalize*: verifies the uploaded object, reads its real size/MIME from storage, enforces limits, and writes the **same `pipeline_data` + `asset` record** a normal file upload would. Config: `schemaId`, `subDir`, `storageKey` (expression, default `request.body.storageKey`), `originalName`, `maxFileSize` (default 500MB), `allowedMimeTypes`, `deleteOnViolation`, `extraFields`.
+
+Client flow:
+1. `POST` your prepare pipeline with `{ filename }` → returns `{ uploadUrl, storageKey, originalName }`
+2. `PUT` the file bytes to `uploadUrl` (straight to the bucket)
+3. `POST` your register pipeline with `{ storageKey, originalName }` → writes the record, returns `{ id, url, ... }`
+
+**Requirements & caveats:**
+- **Bucket storage only** (S3, GCS, MinIO, Azure). On **local** storage `presigned_upload` errors with `PRESIGNED_NOT_SUPPORTED` — the admin UI disables the handler in the picker when storage can't presign. Use `file_upload_handler` instead.
+- The bucket needs **CORS** allowing `PUT` from the site's origin, or the browser blocks the direct upload.
+- Use `generate_upload_schema` (or a matching manual schema) for the record fields, and keep `subDir` identical between the prepare and register steps.
 
 ## Stripe Handlers
 
@@ -124,11 +144,16 @@ Both support conditions to selectively apply (e.g., only rate limit POST request
 2. AI handler → call model with conversation context
 3. Response → return AI response
 
-**File upload with processing:**
+**File upload with processing (small files, proxied):**
 1. File Upload → store file
 2. Image Convert → resize/convert
 3. Data Create → store metadata
 4. Response → return file URL
+
+**Large file upload (direct-to-bucket, two pipelines):**
+- Prepare pipeline: Presigned Upload → Response (return `uploadUrl` + `storageKey`)
+- Client PUTs the file to `uploadUrl` (bucket), then calls:
+- Register pipeline: Register Upload → Response (return the record `url`)
 
 **Stripe payment:**
 1. Form handler → parse product selection
