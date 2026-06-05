@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.4](https://github.com/bffless/skills/compare/skills-v1.8.3...skills-v1.8.4) (2026-06-05)
+
+
+### Documentation
+
+* **pipelines:** document presigned direct-to-bucket upload handlers ([c8c1381](https://github.com/bffless/skills/commit/c8c1381f49acf6e8e81dad9d7f411f4617043a1b))
+* **pipelines:** document presigned direct-to-bucket upload handlers ([f32c272](https://github.com/bffless/skills/commit/f32c27268f1e6d13b3a504417f83141b1a4a8958))
+
 ## [1.8.3](https://github.com/bffless/skills/compare/skills-v1.8.2...skills-v1.8.3) (2026-06-04)
 
 
