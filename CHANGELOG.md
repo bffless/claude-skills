@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.1](https://github.com/bffless/skills/compare/skills-v1.9.0...skills-v1.9.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* **skills:** keep visual-plans gallery cards from overflowing ([f8cbaa0](https://github.com/bffless/skills/commit/f8cbaa0e7ed7fb0593b06a8f3ddbaac90f56fa3d))
+* **skills:** keep visual-plans gallery cards from overflowing ([b54317b](https://github.com/bffless/skills/commit/b54317b0862044157b231ac08f4d7b87cb927600))
+
 ## [1.9.0](https://github.com/bffless/skills/compare/skills-v1.8.4...skills-v1.9.0) (2026-06-18)
 
 
