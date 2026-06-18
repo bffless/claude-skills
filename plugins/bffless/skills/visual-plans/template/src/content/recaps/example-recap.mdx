@@ -1,0 +1,45 @@
+---
+title: "Recap: per-workspace settings (#1234)"
+summary: Adds a jsonb settings column, a PATCH endpoint, and the console form.
+status: done
+date: 2026-06-17
+pr: "#1234"
+tags: [backend]
+---
+
+import { Meta, Callout, FileTree, DataModel, ApiEndpoint, Diff } from '@components';
+
+<Meta title="Recap: per-workspace settings" status="done" date="2026-06-17" tags={['#1234']}
+  objective="What shipped: a jsonb settings column, a PATCH endpoint, and the console form." />
+
+## What changed
+
+<FileTree files={[
+  { path: 'apps/backend/src/db/schema/workspace.ts', change: 'changed', add: 1, del: 0 },
+  { path: 'apps/backend/src/db/migrations/0007_settings.sql', change: 'added', add: 3, del: 0 },
+  { path: 'apps/backend/src/workspaces/workspaces.controller.ts', change: 'changed', add: 18, del: 2 },
+  { path: 'apps/console-ui/src/pages/Settings.tsx', change: 'added', add: 64, del: 0 },
+]} />
+
+## Schema delta
+
+<DataModel table="workspace" caption="1 column added" fields={[
+  { name: 'settings', type: 'jsonb', change: 'added', note: 'NOT NULL default {}' },
+]} />
+
+## New endpoint
+
+<ApiEndpoint method="PATCH" path="/api/workspaces/:id/settings" change="added"
+  summary="merges partial settings"
+  request={`{ "theme": "dark" }`}
+  response={`{ "id": "ws_1", "settings": { "theme": "dark" } }`} />
+
+## Key diff
+
+<Diff file="apps/backend/src/workspaces/workspaces.controller.ts" summary="merge instead of replace"
+  lines={[
+    "-    workspace.settings = body;",
+    "+    workspace.settings = { ...workspace.settings, ...body };",
+  ]} />
+
+<Callout kind="ok">Verified: partial PATCH preserves existing keys; settings survive restart.</Callout>

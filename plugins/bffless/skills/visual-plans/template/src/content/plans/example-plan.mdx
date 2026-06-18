@@ -1,0 +1,90 @@
+---
+title: Add per-workspace settings
+objective: Persist workspace-level settings without a new table or migration churn.
+status: proposed
+date: 2026-06-17
+tags: [backend, schema]
+---
+
+import { Meta, Callout, Steps, Checklist, Columns, DataModel, ApiEndpoint, FileTree, Diff, Diagram, Wireframe, QuestionForm } from '@components';
+
+<Meta title="Add per-workspace settings" status="proposed" date="2026-06-17"
+  objective="Persist workspace-level settings without a new table or migration churn." tags={['backend','schema']} />
+
+## Objective & done criteria
+
+Workspaces need arbitrary key/value settings (theme, feature flags). Done when settings round-trip
+through the API and survive a restart, with no new join table.
+
+<Callout kind="decision">
+Store settings as a single `jsonb` column on `workspace` — flexible, no schema change per setting,
+and read in one query.
+</Callout>
+
+## Approach
+
+<Columns columns={[
+  { title: 'Before', tone: 'before', body: 'Settings hard-coded in env; redeploy to change.' },
+  { title: 'After', tone: 'after', body: 'Settings live in the DB, editable via the API at runtime.' },
+]} />
+
+<DataModel table="workspace" caption="one new column" fields={[
+  { name: 'id', type: 'uuid' },
+  { name: 'name', type: 'text' },
+  { name: 'settings', type: 'jsonb', change: 'added', note: 'default {}' },
+]} />
+
+<Diagram caption="Request flow" nodes={[
+  { id: 'ui', label: 'Console UI', sub: 'settings form' },
+  { id: 'api', label: 'API', sub: 'PATCH /workspaces/:id' },
+  { id: 'db', label: 'Postgres', sub: 'jsonb merge' },
+]} />
+
+## API
+
+<ApiEndpoint method="PATCH" path="/api/workspaces/:id/settings" change="added"
+  summary="Merge partial settings"
+  request={`{ "theme": "dark" }`}
+  response={`{ "id": "ws_1", "settings": { "theme": "dark" } }`} />
+
+## UI
+
+<Wireframe surface="browser" url="console.example.com/settings" caption="Settings tab">
+  <div style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
+    <div className="wf-eyebrow">Workspace settings</div>
+    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+      Theme <span className="wf-chip">dark ▾</span>
+    </label>
+    <button className="wf-btn primary" style={{ justifySelf: 'start' }}>Save</button>
+  </div>
+</Wireframe>
+
+## Implementation steps
+
+<Steps items={[
+  { title: 'Add the column', detail: 'jsonb settings, default {}', files: ['apps/backend/src/db/schema/workspace.ts'] },
+  { title: 'Generate migration', detail: 'pnpm db:generate (interactive — user runs it)' },
+  { title: 'Add PATCH route + merge logic', files: ['apps/backend/src/workspaces/workspaces.controller.ts'] },
+  { title: 'Wire the settings form', files: ['apps/console-ui/src/pages/Settings.tsx'] },
+]} />
+
+<Diff file="apps/backend/src/db/schema/workspace.ts" summary="add settings column"
+  lines={[
+    " export const workspace = pgTable('workspace', {",
+    "   id: uuid('id').primaryKey(),",
+    "   name: text('name').notNull(),",
+    "+  settings: jsonb('settings').notNull().default({}),",
+    " });",
+  ]} />
+
+## Verification
+
+<Checklist items={[
+  { label: 'PATCH merges partial settings (does not replace)', done: false },
+  { label: 'Settings persist across a backend restart', done: false },
+  { label: 'toResponseDto includes the settings field', done: false },
+]} />
+
+<QuestionForm questions={[
+  { q: 'Validate setting keys against an allow-list, or store free-form?', options: ['Allow-list', 'Free-form'], recommend: 'Allow-list' },
+]} />
