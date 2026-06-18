@@ -34,17 +34,17 @@ const sections = [
           ) : (
             <div style="display:grid;gap:10px">
               {s.items.map((it) => (
-                <a href={`/${s.base}/${it.id}/`} class="wf-card" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit">
+                <a href={`/${s.base}/${it.id}/`} class="wf-card" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;min-width:0">
                   <div style="min-width:0;flex:1">
-                    <div style="font-weight:600;font-size:15px">{it.data.title}</div>
+                    <div style="font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.data.title}</div>
                     {('objective' in it.data && it.data.objective) || ('summary' in it.data && it.data.summary) ? (
                       <div class="wf-muted" style="font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                         {('objective' in it.data ? it.data.objective : (it.data as any).summary)}
                       </div>
                     ) : null}
                   </div>
-                  <span class="wf-pill">{it.data.status}</span>
-                  <span class="wf-muted" style="font-size:12px">{fmt(it.data.date)}</span>
+                  <span class="wf-pill" style="flex:none">{it.data.status}</span>
+                  <span class="wf-muted" style="font-size:12px;flex:none;white-space:nowrap">{fmt(it.data.date)}</span>
                 </a>
               ))}
             </div>
