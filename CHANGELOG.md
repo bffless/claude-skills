@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/bffless/skills/compare/skills-v1.8.4...skills-v1.9.0) (2026-06-18)
+
+
+### Features
+
+* **skills:** add visual-plans and visual-recaps skills ([1e74104](https://github.com/bffless/skills/commit/1e74104c535f16930ee30f29b1c6a73a31fce32c))
+* **skills:** add visual-plans and visual-recaps skills ([c15dd50](https://github.com/bffless/skills/commit/c15dd50e239c4072979e38f044a70c7389bf4592))
+
 ## [1.8.4](https://github.com/bffless/skills/compare/skills-v1.8.3...skills-v1.8.4) (2026-06-05)
 
 
