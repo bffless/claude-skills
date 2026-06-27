@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.2](https://github.com/bffless/skills/compare/skills-v1.9.1...skills-v1.9.2) (2026-06-27)
+
+
+### Documentation
+
+* **proxy-rules:** require multi-line function_handler code ([159027b](https://github.com/bffless/skills/commit/159027b0d9cd93f635755bf46186b63807fa1e82))
+* **proxy-rules:** require multi-line function_handler code ([17724cb](https://github.com/bffless/skills/commit/17724cb4cea7f9c00f92718351318b5b1c10afcd))
+
 ## [1.9.1](https://github.com/bffless/skills/compare/skills-v1.9.0...skills-v1.9.1) (2026-06-18)
 
 
