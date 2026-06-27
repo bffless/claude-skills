@@ -1,13 +1,14 @@
 ---
 name: pipeline-to-skill
-description: Generate a project-scoped Claude Code skill from a BFFless proxy rule set so an agent can call the app's dynamic API
+description: Generate a project-scoped agent skill from a BFFless proxy rule set so an agent can call the app's dynamic API
 ---
 
 # Pipeline to Skill
 
-Turn a BFFless app's proxy rule set (its `/api/*` pipelines) into a `.claude/skills/<app>-api/SKILL.md`
-that teaches an agent how to call it. The output lives in the *app's* repo; this generator is
-platform knowledge.
+Turn a BFFless app's proxy rule set (its `/api/*` pipelines) into a portable `<app>-api/SKILL.md`
+that teaches an agent how to call it. The output is a standard `SKILL.md` (name/description
+frontmatter) — the cross-agent format the `skills` CLI installs — so it works in any runtime, not
+just Claude Code. The output lives in the *app's* repo; this generator is platform knowledge.
 
 ## Inputs
 
@@ -58,7 +59,10 @@ platform knowledge.
      validator); rules without it fall back to cookie/session auth. Flag any endpoint a key cannot reach.
 5. **Assemble** sections: front-matter (`name: <app>-api`), intro, Auth, Discovery, one recipe
    per significant endpoint, Gotchas (note private-by-default ACL and presigned/no-key steps).
-6. **Write** to `<app-repo>/.claude/skills/<app>-api/SKILL.md`.
+6. **Write** the `SKILL.md` into the app repo at the location the consuming agent loads project
+   skills from — `.claude/skills/<app>-api/SKILL.md` for Claude Code; other runtimes (Copilot,
+   Gemini CLI, Codex) use their own skills location, or install via the `skills` CLI. The file
+   contents are identical across runtimes; only the path differs.
 
 ## Self-check
 
