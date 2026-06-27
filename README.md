@@ -15,6 +15,7 @@ Originally built as a Claude Code plugin, the skills are plain markdown and also
 | **bffless**           | Platform overview, key concepts, and feature summary     |
 | **cache-and-storage** | Cache rules, storage backends, API keys for CI/CD        |
 | **chat**              | AI chat widget/full-page, skills, streaming, persistence |
+| **pipeline-to-skill** | Generate a project-scoped skill from a BFFless proxy rule set |
 | **pipelines**         | Backend automation with handler chains and DB Records    |
 | **proxy-rules**       | Forward requests to backend APIs, eliminate CORS         |
 | **repository**        | Deployments, aliases, content browser, rollback          |
