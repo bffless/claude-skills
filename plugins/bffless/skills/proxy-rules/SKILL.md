@@ -91,6 +91,32 @@ With strip prefix OFF:
 
 **Microservices**: Different prefixes route to different services
 
+## Authoring Handler Code (function_handler)
+
+Proxy rule sets can include pipeline rules that carry a `function_handler` (custom JavaScript for transformation/logic). When you create or update such a rule through the MCP, the `code` string inside `function_handler.config` is stored **verbatim** and displayed verbatim in the admin UI — the UI does not reformat it.
+
+**Always emit multi-line, indented source — never a minified one-liner.**
+
+- Use real newlines (`\n` in the JSON payload) between statements.
+- Indent with 2 spaces, one statement per line — don't chain statements with semicolons onto one line.
+- Applies to any non-trivial `function_handler` body. A true one-liner like `function handler() { return {}; }` is fine; everything else should be expanded.
+
+Bad (do not submit code like this):
+
+```json
+{ "code": "function handler({ request }) { var h = request.headers || {}; var ip = (h['x-forwarded-for']||'').split(',')[0].trim() || 'unknown'; return { ip: ip }; }" }
+```
+
+Good:
+
+```json
+{
+  "code": "function handler({ request }) {\n  var headers = (request && request.headers) || {};\n  var xff = headers['x-forwarded-for'] || '';\n\n  var firstIp = '';\n  if (typeof xff === 'string' && xff.length > 0) {\n    var parts = xff.split(',');\n    firstIp = parts[0] ? parts[0].trim() : '';\n  }\n\n  return {\n    ip: firstIp || 'unknown',\n  };\n}\n"
+}
+```
+
+The user opens these rules in the admin UI to review and edit them later — a wall-of-text `code` field forces them to manually reformat before they can read it. See the **pipelines** skill ("Authoring Handler Code via MCP") for the full handler authoring guidance and sandbox constraints.
+
 ## Security Notes
 
 - All proxy targets must use HTTPS
