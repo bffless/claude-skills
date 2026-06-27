@@ -32,13 +32,23 @@ platform knowledge.
    - share-link / signed-url / auth-relay handlers: document their known request/response flow.
    - generic `function_handler` + `response_handler`: best-effort request/response shape, clearly
      marked as inferred.
-4. **Write the standard auth section** (identical for every BFFless app):
-   reuse the j5s-dev MCP `X-API-Key` from `~/.claude.json`
-   (`mcpServers.j5s-dev.headers.X-API-Key`); send as `X-API-Key`; identity = project owner;
-   base URL = the app's attached alias. Never store a new credential or write the key into the file.
-   Note the gate: an `X-API-Key` is accepted on rules that allow it (e.g. an `allowApiKey: true`
-   validator); rules without it fall back to cookie/session auth. Flag any endpoint a key cannot
-   reach so an agent does not assume the key works everywhere.
+4. **Write the standard auth section** — the *pattern* is identical for every BFFless app, but the
+   concrete values are environment-specific. **Discover them; never hardcode `j5s-dev` or `j5s.dev`**
+   (those are just the reference platform's MCP-entry name and domain):
+   - **Credential** — the `X-API-Key` of the BFFless MCP server in `~/.claude.json`. The `mcpServers`
+     entry *name* is user-chosen (whatever they called it when adding the MCP), so **identify it by
+     its `url`** — the BFFless admin MCP endpoint `https://admin.<platform-domain>/mcp` — not by name.
+     Derive `<platform-domain>` from that url's host.
+   - **App base URL** — the alias the rule set is attached to on that platform, e.g.
+     `https://<app-alias>.<platform-domain>`.
+   - **Bake the concrete discovered values** into the generated skill: its key-lookup snippet must
+     select the `mcpServers` entry **by `url`** (a `python3` one-liner matching the admin MCP url),
+     and its requests must target the app's real base URL. Do not emit the literal `j5s-dev`/`j5s.dev`
+     unless that is genuinely this environment's value.
+   - Reuse only — send as `X-API-Key`; identity = project owner; never store a new credential or
+     write the key value into the file.
+   - Note the gate: an `X-API-Key` is accepted on rules that allow it (e.g. an `allowApiKey: true`
+     validator); rules without it fall back to cookie/session auth. Flag any endpoint a key cannot reach.
 5. **Assemble** sections: front-matter (`name: <app>-api`), intro, Auth, Discovery, one recipe
    per significant endpoint, Gotchas (note private-by-default ACL and presigned/no-key steps).
 6. **Write** to `<app-repo>/.claude/skills/<app>-api/SKILL.md`.
