@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.1](https://github.com/bffless/skills/compare/skills-v1.10.0...skills-v1.10.1) (2026-06-28)
+
+
+### Documentation
+
+* **authentication:** API key → session for headless automation ([59b96d6](https://github.com/bffless/skills/commit/59b96d65976f24a9174d25f74559b98d055a58bd))
+* **authentication:** document API key → session for headless automation ([556db68](https://github.com/bffless/skills/commit/556db683b6f331189113d83a2a6529a5f70f8a5e))
+
 ## [1.10.0](https://github.com/bffless/skills/compare/skills-v1.9.2...skills-v1.10.0) (2026-06-28)
 
 
