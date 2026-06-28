@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.10.0](https://github.com/bffless/skills/compare/skills-v1.9.2...skills-v1.10.0) (2026-06-28)
+
+
+### Features
+
+* add pipeline-to-skill generator skill ([83febf2](https://github.com/bffless/skills/commit/83febf238f6bbe2ea0845cdc6a06cb101fdd3d30))
+* pipeline-to-skill generator skill ([80f4444](https://github.com/bffless/skills/commit/80f4444cbaefbc4d4c6317ba0a2a4c38705436c0))
+
+
+### Bug Fixes
+
+* discover MCP/domain per environment instead of hardcoding j5s-dev ([a6bcebf](https://github.com/bffless/skills/commit/a6bcebf3a172020ceb620f9a0ed955d3f45caf32))
+* generator output is a portable SKILL.md, not Claude-only ([3b1000d](https://github.com/bffless/skills/commit/3b1000de84c026691b006e7441eeda0440893277))
+* make generated auth runtime-neutral (not Claude-only) ([204911a](https://github.com/bffless/skills/commit/204911ae5882c8d0e00b1e574ac14369a79846db))
+
 ## [1.9.2](https://github.com/bffless/skills/compare/skills-v1.9.1...skills-v1.9.2) (2026-06-27)
 
 
