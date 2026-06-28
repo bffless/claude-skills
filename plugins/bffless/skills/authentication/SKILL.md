@@ -406,6 +406,52 @@ Caveats:
 - Returning `passthrough()` when `enabled === false` lets you fall back to a proxied real backend (pattern #1) on demand.
 - MSW requires `public/mockServiceWorker.js`; generate it once with `npx msw init public/ --save`.
 
+## Headless / Automation Auth (API Key → Session)
+
+An automated client (e.g. a sandboxed coding agent driving Playwright against a **`localhost`** dev server) often holds a project **`X-API-Key`** but no password. The key authenticates the `/api/*` data layer — it does **not** produce a browser session, so login-gated SPA routes never render. `session-from-key` lets that key mint a session **as its own owner**, with no stored password, no admin bounce, and no seeded cookie.
+
+```
+POST /_bffless/auth/session-from-key
+Header: X-API-Key: <project key>
+→ Set-Cookie: bffless_access, bffless_refresh   (the key owner's session, role mirrored)
+→ { "status": "OK", "user": { id, email, role } }
+```
+
+**Why `bffless_access` and not `sAccessToken`:** `localhost` is *cross-origin* to the primary domain, so a `.<primary-domain>`-scoped SuperTokens cookie can never reach it. `localhost` is therefore a **custom domain**, and the relay's self-signed JWT is the only cookie that works there. The session it mints is SuperTokens-independent.
+
+**Authorization:** any valid project key may mint, and the session carries the key owner's *actual* role — no elevation. It is exactly "log in as the key's owner, without their password" — acceptable because the key already authenticates `/api/*` as that owner. Invalid/missing key → `401`; a key owner who isn't a member of the resolved site → `401`. (See CE `docs/adr/0001-api-key-mints-custom-domain-session.md`.)
+
+### Recipe for a localhost headless browser
+
+The dev server proxies `/_bffless` (and `/api`) to the real deployment (e.g. `https://j5s.dev`) — see Local Development → pattern 1. Then, in the browser context:
+
+```js
+// 1. Mint BEFORE navigating to any gated route, so the first session check sees the cookie.
+await page.goto('http://localhost:5173')
+await page.evaluate(async (key) => {
+  await fetch('/_bffless/auth/session-from-key', {
+    method: 'POST', headers: { 'X-API-Key': key }, credentials: 'include',
+  })
+}, process.env.BFFLESS_API_KEY)
+// 2. The browser now holds `bffless_access` on the localhost origin; navigate to the authed page.
+await page.goto('http://localhost:5173/some/gated/route')
+```
+
+**It just works on `localhost` — no extra setup.** Specifically you do **not** need:
+
+- **A `localhost` custom-domain registration.** The proxy's `changeOrigin: true` makes the backend resolve the project from the *deployment* host (`j5s.dev`), never `localhost`, so no `domain_mappings` entry for `localhost` is consulted.
+- **Any `X-Forwarded-Host` / `xfwd` proxy tweak.** The minted cookie carries **no `Domain` attribute**, so the browser scopes it to the origin it received it from (`localhost`); the `Secure` flag is honored because `localhost` is a secure context; and `bffless_access` is validated by JWT signature alone (the host baked into the token is not re-checked).
+
+> Verified end-to-end against a live deployment: the cookie a real headless Chromium stores on `localhost` authenticates the production backend as the key owner.
+
+### Gotcha: turn the app's mocks OFF
+
+If the app ships **MSW** mocks (most BFFless apps do), they intercept `/_bffless/auth/session` and return a *fake* user regardless of the real cookie — so authed screenshots would show mock data, not the real owner. Run the dev server with mocks disabled (e.g. `MOCKS_ENABLED=false`, or the app's `?mocks=off`) so the minted session actually drives the SPA.
+
+### The benign refresh 401 (only if the token expires mid-run)
+
+If you navigate *before* minting, or the 1h access token expires during a long run, the SPA's session check returns guest and triggers its refresh path. That refresh tries SuperTokens `/api/auth/session/refresh` **first** — which **always 401s on `localhost`** (no `sRefreshToken` can live there) — then falls back to `/_bffless/auth/refresh`. That first 401 is **expected, not a bug**; a smoke test that counts failed requests (e.g. `shot.mjs`) should allowlist it. Minting first (as above) avoids it entirely for short runs.
+
 ## Auth Flow Diagram
 
 ```
