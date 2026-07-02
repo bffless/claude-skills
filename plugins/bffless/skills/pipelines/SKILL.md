@@ -56,6 +56,28 @@ Key config:
 - `persistMessages`: store conversation history in a pipeline schema
 - `persistMessagesSchemaId`: which schema to store messages in
 
+### `systemPrompt` vs `messageField` — expression syntax (important, easy to get wrong)
+
+These two fields resolve dynamic values with **different rules** — a bare dotted path works for one but not the other:
+
+| Value you write | `messageField` resolves to | `systemPrompt` resolves to |
+| --- | --- | --- |
+| `steps.prep.system` (bare path) | the step's value (treated as an expression) | **the literal string `"steps.prep.system"`** ⚠️ |
+| `{{steps.prep.system}}` (template) | the value | the value |
+| `Write about {{request.body.topic}}` | interpolated | interpolated |
+| `Plain literal text` | sent as-is | sent as-is |
+
+- **`messageField`** accepts a bare dotted path (`steps.x.y` → expression), a bare word (`message` → `request.body.message`), a `{{…}}` template, or literal text with spaces.
+- **`systemPrompt`** only interpolates via `{{…}}` templates (or a whole-string `$`-prefixed expression); **a bare `steps.x.y` path is sent to the model verbatim**, silently dropping your intended system prompt. To reference another step's output, always use **`{{steps.prep.system}}`**.
+- `{{…}}` substitution here is a plain string replace (custom, not real Handlebars): no HTML/JSON escaping of string values, and it does not re-process the inserted text, so multi-line prompts with quotes/braces come through intact. (`{{{triple}}}` exists too and behaves the same for strings; it only differs for objects, which it `JSON.stringify`s.)
+- `model` is **always literal** — it never evaluates expressions.
+
+Source of truth: `apps/backend/src/pipelines/handlers/ai.handler.ts` (systemPrompt handling) and `execution/expression-evaluator.ts` (`evaluateTemplate`/`evaluateExpression`).
+
+### `ai_handler` output
+
+Access the model's reply at **`steps.<stepName>.content`** (a string) — not via the `messageField` name. In completion mode you can attach images/files with `attachments: [{ type: "image", source: "<expr resolving to a URL or array of URLs>" }]` (an array fans out to one image part per URL; empty values are skipped).
+
 ## HTTP Request Handler
 
 Make outbound API calls to external services from within a pipeline.
