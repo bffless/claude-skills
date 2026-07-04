@@ -218,6 +218,29 @@ Good:
 
 The user opens these rules in the admin UI to review and edit them later. A wall-of-text `code` field forces them to manually reformat before they can read it — treat unformatted handler code the same as committing a minified file to the repo.
 
+### Don't route large result sets through `function_handler` (VM copy cost)
+
+Because `function_handler` runs in a sandboxed VM, **everything it reads from `steps.*` is structure-cloned *into* the VM and everything it returns is cloned back *out***. For a step that does real computation this is fine. But a step whose only job is to **select, wrap, rename, or copy a large result set** pays two-to-three full copies of that data for no real work.
+
+With content-heavy rows (full article HTML, large text/JSON blobs) this materially inflates peak heap for the endpoint and, on a small-heap self-hosted backend, can tip an already-tight process into a V8 "heap out of memory" crash — taking the whole worker down and 502-ing concurrent requests. (Observed live: a reader's `GET /api/items` crashed the backend on ~40 full-content rows until a redundant `merge` step was removed — bffless/apps#148.)
+
+**Respond directly from the data step instead.** `response_handler` bodies interpolate `steps.*`, and `{{{triple}}}` emits the raw JSON of an object/array — so a query result goes straight to the response with no intermediate function:
+
+```jsonc
+// ✅ lean: respond straight from the query — no VM round-trip
+{ "handlerType": "response_handler",
+  "config": { "body": "{\"items\":{{{steps.query}}}}", "contentType": "application/json" } }
+```
+
+**To choose between conditional branches, use conditional `response_handler`s — not a `merge`/select function.** Have an early step compute mutually-exclusive flags (e.g. `hasFeed`/`noFeed`), gate each branch's query on one flag, then emit each branch's result from its own `response_handler` carrying the same `condition`. Exactly one query and one responder fire, and the large result never enters a VM:
+
+```
+prep (sets hasFeed/noFeed) → queryFeed (cond: hasFeed) → queryAll (cond: noFeed)
+                           → respondFeed (cond: hasFeed) → respondAll (cond: noFeed)
+```
+
+Rule of thumb: reach for `function_handler` only when you need computation the templating and typed handlers can't express — **never just to rename, wrap, merge, or copy a list.** If the function body is a loop that only pushes rows into a new array, delete it and respond from the source step.
+
 ## Configuration Tips
 
 1. Name handlers descriptively for readable expressions
@@ -226,6 +249,7 @@ The user opens these rules in the admin UI to review and edit them later. A wall
 4. Check pipeline logs for debugging failed executions
 5. Use `postSteps` for async work after the response is sent (e.g., sending emails)
 6. Format `function_handler` code and non-trivial `response_handler` bodies as multi-line, indented source — see "Authoring Handler Code via MCP" above
+7. Don't add a `function_handler` just to select, wrap, or copy a large result set — respond directly from the data step; see "Don't route large result sets through `function_handler`" above
 
 ## Troubleshooting
 
