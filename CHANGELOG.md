@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.10.2](https://github.com/bffless/skills/compare/skills-v1.10.1...skills-v1.10.2) (2026-07-04)
+
+
+### Documentation
+
+* **pipelines:** document ai_handler systemPrompt vs messageField syntax ([1e4afb9](https://github.com/bffless/skills/commit/1e4afb9090cda89bd6f5aaf2d1f9d95c6f150468))
+* **pipelines:** document ai_handler systemPrompt vs messageField syntax ([d6676bb](https://github.com/bffless/skills/commit/d6676bb1107caff3f8458bc1132d93d030171fcb))
+* **pipelines:** warn against routing large result sets through function_handler ([baea37c](https://github.com/bffless/skills/commit/baea37c16f7ed22e96ff4720c323d674d6571a32))
+* **pipelines:** warn against routing large result sets through function_handler ([caff3c6](https://github.com/bffless/skills/commit/caff3c628a86ea3554f76fcf8a1b9effedb49858))
+
 ## [1.10.1](https://github.com/bffless/skills/compare/skills-v1.10.0...skills-v1.10.1) (2026-06-28)
 
 
