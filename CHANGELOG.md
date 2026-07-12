@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/bffless/skills/compare/skills-v1.10.2...skills-v1.11.0) (2026-07-12)
+
+
+### Features
+
+* rules-as-code skill (CLI, CI sync, PR previews, rollback) ([c261133](https://github.com/bffless/skills/commit/c261133dff1d9ef543e4fc685c52849041e2b5eb))
+* rules-as-code skill (CLI, CI sync, PR previews, rollback) ([9e16206](https://github.com/bffless/skills/commit/9e162069839fb0c35fd8722d19405baa3b72cd8b))
+
+
+### Bug Fixes
+
+* correct rules dev/revisions/rollback flag coverage in rules-as-code skill ([2174752](https://github.com/bffless/skills/commit/21747521ce44d59bb052fcf2cfd8f574ef0e1e2e))
+
 ## [1.10.2](https://github.com/bffless/skills/compare/skills-v1.10.1...skills-v1.10.2) (2026-07-04)
 
 
