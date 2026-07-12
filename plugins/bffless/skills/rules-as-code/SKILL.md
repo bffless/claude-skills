@@ -55,12 +55,13 @@ sugar over the canonical `pipelineConfig` shape.
 | `rules pull [set-name]` | Fetch a live set and decompile to authoring layout | `--from-file`, `--decompile`, `-o <dir>`, `--force` |
 | `rules diff [dirs...]` | Compare local vs. live (CI drift check) | exit `0` sync / `1` drift / `2` error |
 | `rules push [dirs...]` | Compile + idempotently sync to the server | `--dry-run`, `--prune`, `--strict-schemas`, `--name-suffix <suffix>` |
-| `rules dev [dir]` | Local-first watch: rebuild/validate/test on save | `--push` (requires `--name-suffix`) |
-| `rules revisions <set>` | List a set's revision history (last 20 kept) | — |
-| `rules rollback <set>` | Revert a set to a prior revision (a real sync) | `--to <revisionId>` (default: newest non-current), `--dry-run` |
+| `rules dev [dirs...]` | Local-first watch: rebuild/validate/test on save | `--push` (requires `--name-suffix`), `--api-url`/`--api-key`/`--project` |
+| `rules revisions <set>` | List a set's revision history (last 20 kept) | `--api-url`/`--api-key`/`--project` |
+| `rules rollback <set>` | Revert a set to a prior revision (a real sync) | `--to <revisionId>` (default: newest non-current), `--dry-run`, `--api-url`/`--api-key`/`--project` |
 
 `[dirs...]` defaults to the nearest `.bffless/config.json`'s `ruleSets` glob array when
-omitted. `pull`/`push`/`diff` all accept `--api-url`, `--api-key`, `--project` overrides.
+omitted. `pull`/`push`/`diff`/`dev`/`revisions`/`rollback` all accept `--api-url`, `--api-key`,
+`--project` overrides.
 
 ## Config & auth
 
