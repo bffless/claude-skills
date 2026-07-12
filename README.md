@@ -19,6 +19,7 @@ Originally built as a Claude Code plugin, the skills are plain markdown and also
 | **pipelines**         | Backend automation with handler chains and DB Records    |
 | **proxy-rules**       | Forward requests to backend APIs, eliminate CORS         |
 | **repository**        | Deployments, aliases, content browser, rollback          |
+| **rules-as-code**     | Manage proxy rule sets as code in git with the bffless CLI and CI sync |
 | **share-links**       | Token-based sharing for private deployments              |
 | **traffic-splitting** | A/B testing, canary deployments, weighted routing        |
 | **upload-artifact**   | GitHub Action for uploading builds to BFFless            |
