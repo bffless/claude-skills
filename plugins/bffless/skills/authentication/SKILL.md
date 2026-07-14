@@ -248,20 +248,28 @@ Only when content lives on a **separately-owned root** (`bat.com` attached to a 
 
 ```typescript
 function getCustomDomainLoginUrl(adminLoginUrl: string, redirectPath = '/'): string {
-  // Use `host`, NOT `hostname` — host includes the port (e.g. `localhost:5173`).
-  // Using `hostname` strips the port, and the backend builds a callback URL
-  // like `https://localhost/_bffless/auth/callback?...` (no port, wrong scheme)
-  // which is unreachable in local dev.
   const params = new URLSearchParams({
     customDomainRelay: 'true',
-    targetDomain: window.location.host,
-    redirect: redirectPath, // a PATH — the callback is served on targetDomain
+    // `targetDomain` must be a BARE host — use `hostname`, NEVER `host`. The
+    // `domain-token` validator rejects a `:port` ("targetDomain must be a valid
+    // domain name"), and the value is matched against the registered
+    // `domain_mappings` row, which is portless.
+    targetDomain: window.location.hostname,
+    redirect: redirectPath, // a PATH — admin passes it through as `redirectPath`
   });
+  // The port can't live in `targetDomain`, so on localhost it rides in
+  // `targetOrigin` (scheme + host + port). The backend honours this override
+  // ONLY when `targetDomain` is `localhost`/`127.0.0.1`, and builds the callback
+  // URL from it — so the token comes back to `http://localhost:5173/...` with the
+  // dev port intact. Real custom domains have no port and omit it entirely.
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    params.set('targetOrigin', window.location.origin);
+  }
   return `${adminLoginUrl}?${params.toString()}`;
 }
 ```
 
-`targetDomain` must be registered in the workspace (a `domain_mappings` entry, or a subdomain of `PRIMARY_DOMAIN`) or the `domain-token` mint is rejected. After login the admin relays through `POST /api/auth/domain-token` and redirects to `bat.com/_bffless/auth/callback`, which sets `bffless_access`.
+`targetDomain` must be registered in the workspace (a `domain_mappings` entry, or a subdomain of `PRIMARY_DOMAIN`) or the `domain-token` mint is rejected. For localhost dev that means registering the bare host **`localhost`** (no port) as a custom domain — the port lives only in `targetOrigin`, never in the mapping. After login the admin relays through `POST /api/auth/domain-token` and redirects to the callback (`bat.com/_bffless/auth/callback`, or `http://localhost:5173/_bffless/auth/callback` in dev), which sets `bffless_access`.
 
 #### Picking between them
 
@@ -346,7 +354,7 @@ export default defineConfig({
 ```
 
 Caveats:
-- Login redirects you to the admin domain. The `targetDomain` you send must be a registered domain in that workspace — `localhost:5173` will get rejected with "Domain not registered" unless an admin adds it (or you point at a workspace that does). Most teams add their dev host to a sandbox workspace's domain mappings for this purpose.
+- Login redirects you to the admin domain via the relay (`getCustomDomainLoginUrl` above). Register the bare host **`localhost`** (no port) as a custom `domain_mappings` entry for the project — send it as `targetDomain`, and put the dev port in `targetOrigin` (`http://localhost:5173`). Sending `targetDomain=localhost:5173` fails with `400 "targetDomain must be a valid domain name"` (the validator rejects the port); registering `localhost:5173` as the mapping doesn't help, because `targetDomain` has to be the portless value the mint validates. Most teams add their dev host to a sandbox workspace's domain mappings for this purpose.
 - The session endpoint will return the **guest** shape (`200 { authenticated: false, user: null }`) until you complete the login + callback round trip, which is why the body-inspection pattern above is required.
 
 ### 2. Mock `/_bffless/auth/*` with MSW (no backend)
@@ -492,6 +500,10 @@ Additional Custom Domain Flow (edge case):
 
 - The `targetDomain` must match a `domain_mappings` entry or be a subdomain of `PRIMARY_DOMAIN`
 - Check for www vs non-www mismatch
+
+**`400 "targetDomain must be a valid domain name"` on domain-token?**
+
+- You sent a `host:port` (e.g. `localhost:5173`). The `domain-token` DTO validates `targetDomain` as a bare domain name and rejects the `:port`. Send the **portless** host (`localhost`) as `targetDomain`, and put the dev port in `targetOrigin` (`http://localhost:5173`) instead — the backend honours `targetOrigin` only when `targetDomain` is `localhost`/`127.0.0.1` and builds the callback URL from it. Use `window.location.hostname` for `targetDomain`, never `window.location.host`.
 
 **After login the user lands on `admin.foo.com` instead of the content site?**
 
