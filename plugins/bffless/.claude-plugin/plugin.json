@@ -1,6 +1,6 @@
 {
   "name": "bffless",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "BFFless platform skills for Claude Code — deployments, pipelines, proxy rules, chat, traffic splitting, and more",
   "author": {
     "name": "BFFless"

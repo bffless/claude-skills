@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.0](https://github.com/bffless/skills/compare/skills-v1.11.0...skills-v1.12.0) (2026-07-14)
+
+
+### Features
+
+* **rules-as-code:** document rules init and name-based schema sync ([71769df](https://github.com/bffless/skills/commit/71769dfc3d3d49328bdb8304fd21a4e1d8c2639c))
+* **rules-as-code:** document rules init and name-based schema sync ([3bf0497](https://github.com/bffless/skills/commit/3bf049776e13e38284765d5d5209df103075e73c))
+
 ## [1.11.0](https://github.com/bffless/skills/compare/skills-v1.10.2...skills-v1.11.0) (2026-07-12)
 
 
