@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.1](https://github.com/bffless/skills/compare/skills-v1.12.0...skills-v1.12.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* **auth skill:** correct custom-domain relay for localhost (targetOrigin) ([d420a9d](https://github.com/bffless/skills/commit/d420a9d5fb37ab569fc4b119bdc19442e605de91))
+* **auth skill:** correct custom-domain relay for localhost (targetOrigin) ([edc14c8](https://github.com/bffless/skills/commit/edc14c8dc10a546add55d20ef8845aa20098c543))
+
 ## [1.12.0](https://github.com/bffless/skills/compare/skills-v1.11.0...skills-v1.12.0) (2026-07-14)
 
 
