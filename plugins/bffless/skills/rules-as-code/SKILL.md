@@ -49,6 +49,7 @@ sugar over the canonical `pipelineConfig` shape.
 
 | Command | Purpose | Key flags |
 |---|---|---|
+| `rules init [dir]` | Scaffold authoring files (currently: a schema manifest) | `--schema <name>`, `--field <name:type[:required]>` (repeatable), `--force` |
 | `rules build [dirs...]` | Compile authoring dir(s) to export JSON | `-o <file>` (single dir) |
 | `rules validate [dirs...]` | Lint manifests + handler code, no network | — |
 | `rules test [dirs...]` | Run `*.fn.test.yaml` fixtures in a `node:vm` harness | — |
@@ -62,6 +63,26 @@ sugar over the canonical `pipelineConfig` shape.
 `[dirs...]` defaults to the nearest `.bffless/config.json`'s `ruleSets` glob array when
 omitted. `pull`/`push`/`diff`/`dev`/`revisions`/`rollback` all accept `--api-url`, `--api-key`,
 `--project` overrides.
+
+## Schemas: the name is the identity
+
+There is **no chicken-and-egg step** for pipeline schemas — never pre-create one in the
+dashboard to obtain an id. Author `schemas/<name>.schema.yaml` as `{ name, fields }` (no
+`id`), reference it from rules as `$schema:<name>`, and `rules push` resolves by name:
+an existing same-name project schema is reused, a missing one is **created by the sync**.
+Scaffold one with:
+
+```bash
+bffless rules init --schema comments --field author:string:required --field body:text
+```
+
+Field types: `string | number | boolean | email | text | datetime | json`; the trailing
+modifier is `required`/`optional` (default optional). One sharp edge: **push never changes
+the fields of an existing live schema** — the live definition wins (mismatch = warning, or
+a hard error with `push --strict-schemas`). Settle fields before the first push; after
+that, live field changes happen in the dashboard. Also note `--name-suffix` (PR previews)
+suffixes only the *rule set* name — schemas are project-level, so preview sets share the
+same named schemas and data tables as production.
 
 ## Config & auth
 
