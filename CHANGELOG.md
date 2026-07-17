@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.2](https://github.com/bffless/skills/compare/skills-v1.12.1...skills-v1.12.2) (2026-07-17)
+
+
+### Bug Fixes
+
+* **pipelines:** document the real expression syntax ([4f2af0a](https://github.com/bffless/skills/commit/4f2af0a1c873c461b05467ae8391d27e8729ac35))
+* **pipelines:** document the real expression syntax ([98510a8](https://github.com/bffless/skills/commit/98510a89206038ac02eadd6f6032489e6ba57f46))
+
 ## [1.12.1](https://github.com/bffless/skills/compare/skills-v1.12.0...skills-v1.12.1) (2026-07-14)
 
 
