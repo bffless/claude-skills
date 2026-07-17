@@ -83,7 +83,7 @@ Access the model's reply at **`steps.<stepName>.content`** (a string) — not vi
 Make outbound API calls to external services from within a pipeline.
 
 Key config:
-- `url`: target URL (supports expressions like `${steps.prev.apiUrl}`)
+- `url`: target URL (supports expressions like `steps.prev.apiUrl`)
 - `method`: GET, POST, PATCH, DELETE
 - `body`: request body (expressions supported)
 - `headers`: custom headers to add
@@ -133,16 +133,47 @@ Client flow:
 
 ## Expression Syntax
 
-Access data throughout the pipeline using expressions:
+Expressions are **bare dot-notation paths** — there is no `${...}` wrapper. Write the path
+directly as the config value:
 
-- `input.*` - Parsed request body
-- `query.*` - URL query parameters
-- `params.*` - URL path parameters
-- `headers.*` - Request headers
-- `steps.<name>.*` - Output from previous handler
-- `user.*` - Authenticated user info (if applicable)
+```yaml
+fields:
+  email: request.body.email        # correct
+  name: ${request.body.name}       # WRONG — no such syntax
+```
 
-Example: `${input.email}` or `${steps.createUser.id}`
+There are exactly **six roots**. Anything else is not an expression:
+
+| Root | Contains |
+| --- | --- |
+| `request.*` | `body`, `query`, `method`, `path`, `headers`, `ip`, `userAgent` — any other property throws |
+| `steps.<name>.*` | Output of a previous step (`steps.<name>` alone gives the whole object) |
+| `user.*` | `id`, `email`, `role` — `null` when unauthenticated |
+| `metadata.*` | The raw request metadata `request.*` is a friendly alias onto |
+| `deployment.*` | `owner`, `repo`, `commitSha`, `alias` |
+| `secrets.<NAME>` | Project secrets; a missing one resolves to `null`, it does not throw |
+
+Built-ins: `now()` (ISO 8601 timestamp), `uuid()`. Literals pass through unchanged:
+`true`, `false`, `null`, integers, floats, and `"quoted strings"`.
+
+> ⚠️ **`input.*` was removed in CE v0.2.0** (released 2026-07-12) — use `request.body.*`.
+> This matters more than it looks: an expression whose root isn't one of the six above is
+> **returned as a literal string**, not an error. A pipeline with `name: input.name` writes
+> the eight characters `input.name` into your database and mails it out, with a 200 and no
+> warning. The same applies to any typo'd root.
+
+### Templates
+
+Inside string values (email bodies, subjects, response bodies), interpolate with braces:
+
+- `{{expr}}` — string interpolation. `null`/`undefined` become empty string; objects become `[object Object]`.
+- `{{{expr}}}` — raw output, no HTML escaping. Objects are JSON-stringified — this is how you
+  emit a JSON array or object into a response body.
+
+```yaml
+subject: "New submission from {{request.body.name}}"
+body: '{"episodes": {{{steps.shape.episodes}}}}'
+```
 
 ## Validators
 
