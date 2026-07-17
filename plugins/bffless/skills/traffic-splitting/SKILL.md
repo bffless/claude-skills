@@ -34,6 +34,31 @@ Rules override weights based on conditions. Evaluated in order, first match wins
 - **Cookies**: Match cookie values
 - **Share link**: Route specific share links to specific aliases
 
+## Configuring via MCP
+
+If the BFFless MCP server is connected, configure splits and rules directly with these tools instead of the admin UI or raw REST calls. All operate on a **domain mapping ID** (get one from `list_domains` / `get_domain`).
+
+**Weights**
+- `get_traffic_config(domainId)` — current split + sticky-session settings (`{ weights[], stickySessionsEnabled, stickySessionDuration }`); empty weights = single-alias
+- `list_traffic_aliases(domainId)` — aliases available to weight (discover valid names first)
+- `set_traffic_weights(domainId, weights[], stickySessionsEnabled?, stickySessionDuration?)` — set the split. `weights` is `[{ alias, weight, path? }]` and **must sum to 100** (rejected otherwise). Per-weight `path` is optional and falls back to the domain mapping's path — omit it unless a variant serves from a different subdirectory.
+- `clear_traffic_weights(domainId)` — remove the split, return to the single alias
+
+**Rules** (override weights; first match wins by priority, lower first)
+- `list_traffic_rules(domainId)`
+- `create_traffic_rule(domainId, alias, conditionType, conditionKey, conditionValue, priority?, label?)` — `conditionType` is `query_param` | `cookie` | `header`
+- `update_traffic_rule(ruleId, ...)`
+- `delete_traffic_rule(ruleId)`
+
+Example — 50/50 production/red split with a `?v=red` force rule:
+```
+set_traffic_weights("<domainId>", [
+  { alias: "production", weight: 50 },
+  { alias: "red", weight: 50 },
+])
+create_traffic_rule("<domainId>", "red", "query_param", "v", "red", 10, "Force red")
+```
+
 ## Use Cases
 
 **A/B Testing**: Split traffic 50/50 between variants, measure conversion
