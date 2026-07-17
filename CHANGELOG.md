@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.3](https://github.com/bffless/skills/compare/skills-v1.12.2...skills-v1.12.3) (2026-07-17)
+
+
+### Documentation
+
+* **traffic-splitting:** reference the new MCP tools ([8d38ab3](https://github.com/bffless/skills/commit/8d38ab366a276e702ae432a97ef0c8d9b3960c69))
+* **traffic-splitting:** reference the new MCP tools ([4c11a42](https://github.com/bffless/skills/commit/4c11a422516273a0766425f280a6b89c6496def5))
+
 ## [1.12.2](https://github.com/bffless/skills/compare/skills-v1.12.1...skills-v1.12.2) (2026-07-17)
 
 
