@@ -44,6 +44,15 @@ Schema-based data storage built into BFFless:
 2. Use Data CRUD handlers to interact with records
 3. Query with filters, sorting, pagination
 
+Since CE v0.3.11 the data-write handlers (`data_create`, `data_update`, `data_upsert_many`)
+coerce written values to the schema's declared field types: `number` fields accept numbers,
+numeric strings, and date-parsable strings (stored as epoch milliseconds — so `createdMs: now()`
+stores a number); `boolean` fields accept booleans and `"true"`/`"false"`. A value that can't
+be coerced fails the step with `VALIDATION_ERROR` (a per-item error in `data_upsert_many`)
+instead of being written. On older CE versions values are stored verbatim — a `now()` ISO
+string lands in a `number` field unchanged — so clients reading pre-v0.3.11 records should
+parse timestamp fields defensively (they may hold either shape).
+
 ## AI Handler
 
 Call AI models directly from pipelines. Supports chat (multi-turn) and completion (single-turn) modes.
@@ -153,8 +162,11 @@ There are exactly **six roots**. Anything else is not an expression:
 | `deployment.*` | `owner`, `repo`, `commitSha`, `alias` |
 | `secrets.<NAME>` | Project secrets; a missing one resolves to `null`, it does not throw |
 
-Built-ins: `now()` (ISO 8601 timestamp), `uuid()`. Literals pass through unchanged:
-`true`, `false`, `null`, integers, floats, and `"quoted strings"`.
+Built-ins: `now()` (ISO 8601 timestamp — a **string**), `now_ms()` (epoch milliseconds — a
+**number**; CE ≥ v0.3.11), `uuid()`. For number-typed `*Ms` schema fields prefer `now_ms()`.
+On CE older than v0.3.11 `now_ms()` is not a built-in and falls into the literal-string trap
+below — the eight characters `now_ms()` get written instead of a timestamp. Literals pass
+through unchanged: `true`, `false`, `null`, integers, floats, and `"quoted strings"`.
 
 > ⚠️ **`input.*` was removed in CE v0.2.0** (released 2026-07-12) — use `request.body.*`.
 > This matters more than it looks: an expression whose root isn't one of the six above is
