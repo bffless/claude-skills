@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.4](https://github.com/bffless/skills/compare/skills-v1.12.3...skills-v1.12.4) (2026-08-05)
+
+
+### Documentation
+
+* **pipelines:** document now_ms() and schema-type coercion (CE v0.3.11) ([e15fe91](https://github.com/bffless/skills/commit/e15fe91fd2d8fc4162a319d7f03d189bf649dc99))
+* **pipelines:** document now_ms() built-in and schema-type coercion (CE v0.3.11) ([44b747a](https://github.com/bffless/skills/commit/44b747ad86da04689519d367bf9de70da5e8c952))
+* the upload record shape, and schema `kind:` ([7c952d5](https://github.com/bffless/skills/commit/7c952d5125ea367bb0525db4b7c917ba5ba8a1e1))
+* the upload record shape, and schema `kind:` ([2435ab1](https://github.com/bffless/skills/commit/2435ab1e812af0b88ad3a9ff60771b376a24a822))
+
 ## [1.12.3](https://github.com/bffless/skills/compare/skills-v1.12.2...skills-v1.12.3) (2026-07-17)
 
 
