@@ -49,7 +49,7 @@ sugar over the canonical `pipelineConfig` shape.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `rules init [dir]` | Scaffold authoring files (currently: a schema manifest) | `--schema <name>`, `--field <name:type[:required]>` (repeatable), `--force` |
+| `rules init [dir]` | Scaffold authoring files (currently: a schema manifest) | `--schema <name>`, `--field <name:type[:required]>` (repeatable), `--kind <upload\|chat\|state>`, `--force` |
 | `rules build [dirs...]` | Compile authoring dir(s) to export JSON | `-o <file>` (single dir) |
 | `rules validate [dirs...]` | Lint manifests + handler code, no network | — |
 | `rules test [dirs...]` | Run `*.fn.test.yaml` fixtures in a `node:vm` harness | — |
@@ -83,6 +83,36 @@ a hard error with `push --strict-schemas`). Settle fields before the first push;
 that, live field changes happen in the dashboard. Also note `--name-suffix` (PR previews)
 suffixes only the *rule set* name — schemas are project-level, so preview sets share the
 same named schemas and data tables as production.
+
+### `kind:` — say what a schema is for
+
+A schema may declare `kind: upload | chat | state`, which is how the dashboard knows what it
+is instead of guessing from field names (an upload schema is otherwise recognised by
+declaring `storage_path` + `content_type` + `url`). Scaffold it with
+`bffless rules init --schema avatars --kind upload`, or add the key by hand:
+
+```yaml
+name: avatars
+kind: upload
+fields:
+  - name: storage_path
+    type: string
+```
+
+`kind` is **optional and additive** — omit it for a plain data schema. It states primary
+intent, not exclusivity: an upload schema may still hold rows that aren't files.
+
+Unlike fields, a declared kind *is* pushed onto an existing schema — but only to fill a gap:
+
+| live | yaml | result |
+| --- | --- | --- |
+| none | `upload` | adopted; `rules push` prints `declared kind adopted by: <name>` |
+| `upload` | `upload` | unchanged |
+| `upload` | `chat` | **warning**, live kind kept — change it in the dashboard |
+| `upload` | absent | unchanged |
+
+A conflict never rewrites the live value and never fails the push (`--strict-schemas` covers
+field drift only). A typo'd kind fails the *build*, before anything is sent.
 
 ## Config & auth
 

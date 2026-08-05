@@ -124,7 +124,36 @@ Client flow:
 **Requirements & caveats:**
 - **Bucket storage only** (S3, GCS, MinIO, Azure). On **local** storage `presigned_upload` errors with `PRESIGNED_NOT_SUPPORTED` — the admin UI disables the handler in the picker when storage can't presign. Use `file_upload_handler` instead.
 - The bucket needs **CORS** allowing `PUT` from the site's origin, or the browser blocks the direct upload.
-- Use `generate_upload_schema` (or a matching manual schema) for the record fields, and keep `subDir` identical between the prepare and register steps.
+- Keep `subDir` identical between the prepare and register steps.
+- Use `generate_upload_schema`, or a manual schema matching the record shape below.
+
+### The upload record shape
+
+Both upload paths (`file_upload_handler` and `register_upload`) write the **same** keys,
+whatever the target schema declares — the write is not driven by the schema:
+
+| Field | Type | |
+| --- | --- | --- |
+| `filename` | string | stored filename, UUID-prefixed unless `keyStrategy: verbatim` |
+| `storage_path` | string | full storage key — **the marker that makes a record a file** |
+| `content_type` | string | MIME type read from the upload |
+| `size` | number | bytes |
+| `url` | string | public serving path (`/api/uploads/…`) |
+| `sub_dir` | string | the resolved `subDir` |
+| `original_name` | string | filename as the client sent it |
+
+Plus any `extraFields` you configure. So a schema declaring different names doesn't break
+uploads — the record is still written correctly — but the schema then describes something
+its own data isn't: undeclared fields are invisible to search, and the dashboard won't treat
+it as an upload schema. Declare all seven (and every `extraFields` name), or the sync and the
+MCP rule tools will warn you about the gap.
+
+A schema is free to hold non-file rows alongside uploads — an app modelling a file tree
+stores its folders in the same schema. That's supported; the Uploads views filter on
+`storage_path` rather than assuming every row is a file.
+
+Say what the schema is for with `kind: upload` (see the `rules-as-code` skill), so the
+dashboard stops inferring it from field names.
 
 ## Stripe Handlers
 
