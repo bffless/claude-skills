@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.0](https://github.com/bffless/skills/compare/skills-v1.12.4...skills-v1.13.0) (2026-08-18)
+
+
+### Features
+
+* **pipelines:** document remote_request + remote connections ([eb8766a](https://github.com/bffless/skills/commit/eb8766a8cd768246320a2655a2957121dcb829d6))
+* **pipelines:** document the remote_request handler and remote connections ([79dd703](https://github.com/bffless/skills/commit/79dd70360fdad581ccef630a4d119903e2b6ceca))
+
 ## [1.12.4](https://github.com/bffless/skills/compare/skills-v1.12.3...skills-v1.12.4) (2026-08-05)
 
 
