@@ -24,6 +24,7 @@ Pipelines provide backend functionality for static sites without writing server 
 | **Function** | `function_handler` | Custom JavaScript for transformation/logic |
 | **AI** | `ai_handler` | Call OpenAI/Anthropic/Google AI models (chat or completion) |
 | **HTTP Request** | `http_request` | Make outbound HTTP requests to external APIs |
+| **Remote Request** | `remote_request` | Call an admin-configured *remote connection* (your own service, e.g. on Cloud Run) with the platform's identity; long hold-open, per-connection fuse |
 | **File Upload** | `file_upload_handler` | Upload files from forms or URLs to storage |
 | **File Serve** | `file_serve_handler` | Serve files from storage with Range request support |
 | **Image Convert** | `image_convert_handler` | Convert images between PNG/JPEG/WebP using sharp |
@@ -97,6 +98,22 @@ Key config:
 - `body`: request body (expressions supported)
 - `headers`: custom headers to add
 - `forwardAuth`: forward the original request's auth header
+
+## Remote Request Handler (remote connections)
+
+`remote_request` calls a **remote connection** — a named base URL + auth an admin configured once under **Admin Settings → Infrastructure → Remote connections** (or via env `REMOTE_CONNECTION_<NAME>_URL/_AUTH/_CREDENTIAL_JSON/_MAX_INFLIGHT/_HEALTH_PATH`). The step never sees a credential: CE mints a Google ID token per request (`auth: google_id_token`, Cloud Run IAM) or sends none (`auth: none`, private networks). Use it for services *you* run (transcoders, renderers, workers); use `http_request` for public third-party APIs.
+
+```json
+{ "name": "render", "handlerType": "remote_request",
+  "config": { "connection": "pdf-renderer", "path": "/render", "method": "POST",
+              "body": "request.body", "timeoutSeconds": 600 } }
+```
+
+- `connection` (required, static slug), `path` (default `/`, `{{ }}` templates allowed, must start with `/`), `method` (default `POST`), `body` (expression or `{field: expression}`), `headers` (expressions; never `Authorization` — the connection supplies it), `timeoutSeconds` (default 300, max 3600 — the request is **held open**, so long jobs are fine), `failOnError` (default true).
+- Output is **always** `{ ok, status, body, latencyMs, connection, attempts }` — read fields as `steps.render.body.<field>`.
+- Errors: `REMOTE_CONNECTION_UNKNOWN` (no such connection on this instance) · `REMOTE_BUSY` (per-connection in-flight cap hit — retry later) · `REMOTE_UNAVAILABLE` (transport/auth; `details.status` when any) · `REMOTE_TIMEOUT` · `REMOTE_REQUEST_ERROR` (non-2xx when `failOnError`, `details.{status, body}`) · `REMOTE_RESPONSE_TOO_LARGE`.
+- Retries once only when the service demonstrably never took the request (connect failure, 429/503 from the front door) — never on a body.
+- Rules-as-code: reference connections by **name**; each instance maps the name to its own URL/credential.
 
 ## File Handlers
 
