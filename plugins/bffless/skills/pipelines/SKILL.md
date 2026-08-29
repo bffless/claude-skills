@@ -28,7 +28,7 @@ Pipelines provide backend functionality for static sites without writing server 
 | **File Upload** | `file_upload_handler` | Upload files from forms or URLs to storage |
 | **File Serve** | `file_serve_handler` | Serve files from storage with Range request support |
 | **Image Convert** | `image_convert_handler` | Convert images between PNG/JPEG/WebP using sharp |
-| **Video (ffmpeg)** | `ffmpeg_handler` | Server-side video ops on storage objects: five operations — probe, extract_audio, slice, concat, frames. There is no contact_sheet op: a contact sheet is `frames` (stills at times you supply) with its optional `draw` and `tile` blocks. Opt-in per instance; probe first and fall back to the browser on `server: false` |
+| **Video (ffmpeg)** | `ffmpeg_handler` | Server-side video ops on storage objects: probe, extract_audio, slice, concat (CE >= 0.4.25) and frames (CE >= 0.4.35). There is no contact_sheet op: a contact sheet is `frames` (stills at times you supply) with its optional `draw` and `tile` blocks. Opt-in per instance; probe first, check `ops` for the operation you need, and fall back to the browser on `server: false` |
 | **Signed URL** | `signed_url` | Generate time-limited presigned URLs for downloading storage files |
 | **Presigned Upload** | `presigned_upload` | Issue a presigned URL so clients upload large files directly to the bucket (prepare) |
 | **Register Upload** | `register_upload` | Record a file that was uploaded directly to the bucket (finalize) |
