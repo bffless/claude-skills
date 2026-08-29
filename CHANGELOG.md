@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.1](https://github.com/bffless/skills/compare/skills-v1.13.0...skills-v1.13.1) (2026-08-29)
+
+
+### Documentation
+
+* **pipelines:** add the ffmpeg_handler row to the handler table ([3770714](https://github.com/bffless/skills/commit/3770714f81f332526b14ae5848cd036f1ac574f2))
+* **pipelines:** add the ffmpeg_handler row to the handler table ([8ca90c6](https://github.com/bffless/skills/commit/8ca90c69e82bfd18af80cefa95684a39255cd869))
+* **pipelines:** five ffmpeg operations, not six ([9c74a63](https://github.com/bffless/skills/commit/9c74a63b20122df88e4cf32d4aa551467c9f2142))
+* **pipelines:** note the CE version each ffmpeg op needs ([4f5bbcd](https://github.com/bffless/skills/commit/4f5bbcd0b686464889daa4f225a6603b455a9e53))
+
 ## [1.13.0](https://github.com/bffless/skills/compare/skills-v1.12.4...skills-v1.13.0) (2026-08-18)
 
 

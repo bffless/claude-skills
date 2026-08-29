@@ -1,6 +1,6 @@
 {
   "name": "@bffless/skills",
-  "version": "1.13.0",
+  "version": "1.13.1",
   "description": "BFFless platform skills — usable with Claude Code or any agent via the `skills` CLI",
   "keywords": [
     "skills",
