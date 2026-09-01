@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.14.0](https://github.com/bffless/skills/compare/skills-v1.13.1...skills-v1.14.0) (2026-09-01)
+
+
+### Features
+
+* bffless:workflow — authoring workflow implementations ([2064c17](https://github.com/bffless/skills/commit/2064c17fbf660d291aacb053b3d58d1c785710a9))
+* bffless:workflow — authoring workflow implementations ([df27f41](https://github.com/bffless/skills/commit/df27f4196b3a0553710c732e86ab3dda2244032b))
+
 ## [1.13.1](https://github.com/bffless/skills/compare/skills-v1.13.0...skills-v1.13.1) (2026-08-29)
 
 
