@@ -24,6 +24,7 @@ Originally built as a Claude Code plugin, the skills are plain markdown and also
 | **traffic-splitting** | A/B testing, canary deployments, weighted routing        |
 | **upload-artifact**   | GitHub Action for uploading builds to BFFless            |
 | **use-bff-state**     | React hook for server-side state with Data Tables        |
+| **workflow**          | Author and deploy Workflow harness implementations with the @bffless/workflow CLI |
 
 ## Install
 
