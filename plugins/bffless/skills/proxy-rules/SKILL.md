@@ -117,6 +117,10 @@ Good:
 
 The user opens these rules in the admin UI to review and edit them later — a wall-of-text `code` field forces them to manually reformat before they can read it. See the **pipelines** skill ("Authoring Handler Code via MCP") for the full handler authoring guidance and sandbox constraints.
 
+## MCP servers on a rule set
+
+A rule set can *be* an MCP server: one `mcp_handler` pipeline rule at `/api/mcp` whose tools are sibling rules of the same alias, gated by each sibling's `auth_required` (roles + `requiredScopes`), plus a one-step `oauth_protected_resource` rule for claude.ai. See the **mcp** skill — not to be confused with the admin MCP server (`admin.<host>/mcp`) whose tools this skill uses.
+
 ## Security Notes
 
 - All proxy targets must use HTTPS

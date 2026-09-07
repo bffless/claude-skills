@@ -18,15 +18,21 @@ Pipelines provide backend functionality for static sites without writing server 
 | **Data Query** | `data_query` | Read/list DB records with filters, sorting, pagination |
 | **Data Update** | `data_update` | Update existing DB records |
 | **Data Delete** | `data_delete` | Delete DB records |
+| **Data Upsert Many** | `data_upsert_many` | Insert a batch of records from an array expression, mapped per item (`steps.item.*`), deduplicated on a key column |
 | **Aggregate** | `db_aggregate` | Count/Sum/Avg/Min/Max on data, with optional groupBy for grouped results |
 | **Email** | `email_handler` | Send emails via configured provider |
+| **Delay** | `delay` | Pause the pipeline for a duration (polling backoff, pacing webhook chains) |
 | **Response** | `response_handler` | Return custom JSON, status codes, or redirect |
 | **Function** | `function_handler` | Custom JavaScript for transformation/logic |
 | **AI** | `ai_handler` | Call OpenAI/Anthropic/Google AI models (chat or completion) |
 | **HTTP Request** | `http_request` | Make outbound HTTP requests to external APIs |
 | **Remote Request** | `remote_request` | Call an admin-configured *remote connection* (your own service, e.g. on Cloud Run) with the platform's identity; long hold-open, per-connection fuse |
+| **GitHub API** | `github_api` | Call GitHub as the platform: create repo from template, set variable, issues/comments, PR close/merge/list, `repository_dispatch`, workflow runs |
+| **Google Calendar** | `google_calendar` | list_calendars, freebusy, list/create/update/delete events via the admin-configured Google connection |
+| **XML Feed Parse** | `xml_feed_parse` | Fetch and parse RSS/Atom feeds (URL(s) or inline `xml`) into entries |
 | **File Upload** | `file_upload_handler` | Upload files from forms or URLs to storage |
 | **File Serve** | `file_serve_handler` | Serve files from storage with Range request support |
+| **File Delete** | `file_delete` | Delete objects under the project's uploads root by prefix, key, or record |
 | **Image Convert** | `image_convert_handler` | Convert images between PNG/JPEG/WebP using sharp |
 | **Video (ffmpeg)** | `ffmpeg_handler` | Server-side video ops on storage objects: probe, extract_audio, slice, concat (CE >= 0.4.25) and frames (CE >= 0.4.35). There is no contact_sheet op: a contact sheet is `frames` (stills at times you supply) with its optional `draw` and `tile` blocks. Opt-in per instance; probe first, check `ops` for the operation you need, and fall back to the browser on `server: false` |
 | **Signed URL** | `signed_url` | Generate time-limited presigned URLs for downloading storage files |
@@ -37,6 +43,8 @@ Pipelines provide backend functionality for static sites without writing server 
 | **Vector Search** | `vector_search` | Query embeddings by cosine similarity |
 | **Stripe Checkout** | `stripe_checkout` | Create Stripe Checkout sessions for payments/subscriptions |
 | **Stripe Webhook** | `stripe_webhook` | Validate Stripe webhook signatures and parse events |
+| **MCP Server** | `mcp_handler` | Answer as a stateless Streamable-HTTP MCP server; tools and `ui://` resources map to sibling rules — see the **mcp** skill |
+| **OAuth Discovery (MCP)** | `oauth_protected_resource` | Serve the RFC 9728 protected-resource document for an `mcp_handler` (CE >= 0.4.52); implies `bypassVisibility` — see the **mcp** skill |
 
 ## DB Records
 

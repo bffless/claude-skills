@@ -21,6 +21,10 @@ app it backs — CI syncs it on every merge. Keep using the dashboard/MCP (see t
 same server-side data — a set is never locked into one mode; a dashboard edit to a
 git-managed set is warned, not blocked (see [Troubleshooting](#troubleshooting)).
 
+An MCP server built on a project is just a rule set in this layout (endpoint rule + tool
+rules + a well-known discovery rule); see the **mcp** skill for the shape and the
+`bffless/presentations` `images` set for a live copy.
+
 ## Directory layout
 
 ```
