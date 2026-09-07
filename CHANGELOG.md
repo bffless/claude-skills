@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.0](https://github.com/bffless/skills/compare/skills-v1.14.0...skills-v1.15.0) (2026-09-07)
+
+
+### Features
+
+* bffless:mcp — build an MCP server on a project with mcp_handler ([7c0136f](https://github.com/bffless/skills/commit/7c0136f7bfe1e6542987200ad029d879575d9a4c))
+* bffless:mcp — build an MCP server on a project with mcp_handler ([f6ba0a5](https://github.com/bffless/skills/commit/f6ba0a5945bb17723a8f3c7eef62bcf6f4b118b7)), closes [#62](https://github.com/bffless/skills/issues/62)
+
 ## [1.14.0](https://github.com/bffless/skills/compare/skills-v1.13.1...skills-v1.14.0) (2026-09-01)
 
 
